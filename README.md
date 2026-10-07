@@ -131,8 +131,8 @@ If `hyprctl configerrors` prints nothing, the manual setup is ready.
 | Exit overview | `Super+Escape` |
 
 The focus, move and resize bindings retain Omarchy's normal behavior whenever
-the active window is not using Hyprscroll2D. The overview shortcuts are reserved
-by Hyprscroll2D.
+the active window is not using Hyprscroll2D. `Super+Enter` selects the overview
+window while overview is active and otherwise keeps Omarchy's terminal action.
 
 In overview mode, every window is scaled into the viewport. Use `Super+Arrow`
 to select a window or click one directly, then press `Super+Enter` to return to

@@ -45,6 +45,19 @@ local function workspace_key(ctx)
     return "global"
 end
 
+_G.__hyprscroll2d_is_overview_active = function()
+    local ok, window = pcall(hl.get_active_window)
+    if not ok or not window then return false end
+
+    local workspace = safe_field(window, "workspace")
+    local id = safe_field(workspace, "id")
+    local name = safe_field(workspace, "name")
+    local state = id and workspaces["workspace:" .. tostring(id)]
+        or name and workspaces["workspace-name:" .. tostring(name)]
+        or workspaces.global
+    return state and state.overview == true or false
+end
+
 local function describe(ctx)
     local descriptors = {}
     local active_id = nil

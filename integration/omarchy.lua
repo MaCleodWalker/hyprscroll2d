@@ -15,10 +15,13 @@ end
 
 local function route(message, fallback)
     return function()
-        if is_hyprscroll2d_active() then
+        local active_layout = is_hyprscroll2d_active()
+        local overview_active = rawget(_G, "__hyprscroll2d_is_overview_active")
+        if active_layout and (message ~= "overview-exit" or (overview_active and overview_active())) then
             hl.dispatch(hl.dsp.layout(message))
         elseif fallback then
-            hl.dispatch(fallback())
+            local dispatcher = fallback()
+            if dispatcher then hl.dispatch(dispatcher) end
         end
     end
 end
@@ -42,7 +45,9 @@ replace("SUPER + DOWN", "Focus down", "focus down", function()
 end)
 
 replace("SUPER + M", "Toggle 2D overview", "overview")
-replace("SUPER + RETURN", "Select overview window", "overview-exit")
+replace("SUPER + RETURN", "Select overview window", "overview-exit", function()
+    o.launch_terminal()()
+end)
 replace("SUPER + ESCAPE", "Exit 2D overview", "overview-exit")
 
 replace("SUPER + SHIFT + LEFT", "Move window left", "move left", function()

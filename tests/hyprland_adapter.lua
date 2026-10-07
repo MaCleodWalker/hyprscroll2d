@@ -17,6 +17,9 @@ _G.hl = {
         active_callback = callback
         return true
     end,
+    get_active_window = function()
+        return { workspace = { id = 9 } }
+    end,
     dispatch = function(dispatcher)
         table.insert(dispatched, dispatcher)
     end,
@@ -72,6 +75,7 @@ assert(type(response) == "string", "invalid resize command should return an erro
 
 response = registered.provider.layout_msg(ctx, "overview")
 assert(response == true, "overview command was rejected")
+assert(_G.__hyprscroll2d_is_overview_active(), "overview state was not exposed to keybindings")
 registered.provider.recalculate(ctx)
 assert(a.placed.x >= 0 and b.placed.x + b.placed.w <= ctx.area.w, "overview windows should fit the viewport")
 
@@ -83,6 +87,7 @@ assert(#dispatched == dispatch_count, "mouse selection should not exit overview"
 
 response = registered.provider.layout_msg(ctx, "overview-exit")
 assert(response == true, "overview exit command was rejected")
+assert(not _G.__hyprscroll2d_is_overview_active(), "overview state remained active after exit")
 registered.provider.recalculate(ctx)
 assert(b.placed.x > a.placed.x, "overview exit should restore the normal layout")
 
