@@ -5,6 +5,7 @@ local root = tests_dir:match("^(.*)/tests$") or "."
 local bindings = {}
 local dispatched = {}
 local active_layout = "lua:hyprscroll2d"
+local workspace_rule = nil
 
 _G.o = {
     bind = function(keys, _, action)
@@ -13,7 +14,16 @@ _G.o = {
 }
 
 _G.hl = {
+    layout = {
+        register = function() end,
+    },
+    on = function()
+        return true
+    end,
     unbind = function() end,
+    workspace_rule = function(rule)
+        workspace_rule = rule
+    end,
     get_active_window = function()
         return { layout = { name = active_layout } }
     end,
@@ -59,5 +69,14 @@ assert(#dispatched == dispatch_count, "overview toggle should not run in another
 active_layout = "lua:hyprscroll2d"
 bindings["SUPER + SHIFT + code:21"]()
 assert(dispatched[#dispatched].message == "resize height grow", "wrong height resize message")
+
+assert(loadfile(root .. "/integration/plugin.lua"))()
+local config = assert(loadfile(root .. "/layout/config.lua"))()
+assert(workspace_rule and workspace_rule.workspace == tostring(config.workspace),
+    "plugin did not use the configured workspace")
+workspace_rule = nil
+assert(loadfile(root .. "/integration/plugin.lua"))()
+assert(workspace_rule and workspace_rule.workspace == tostring(config.workspace),
+    "plugin reload did not reapply the configured workspace")
 
 print("ok - mocked Omarchy integration")
