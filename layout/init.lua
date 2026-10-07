@@ -162,7 +162,17 @@ if not rawget(_G, "__hyprscroll2d_focus_subscription") then
                     or name and workspaces["workspace-name:" .. tostring(name)]
                     or workspaces.global
                 if not (state and state.overview) then
-                    hl.dispatch(hl.dsp.layout("follow"))
+                    local result = hl.dispatch(hl.dsp.layout("follow"))
+                    if result.ok and window.mapped and window.active then
+                        local at, size = window.at, window.size
+                        if at and size and size.x > 0 and size.y > 0 then
+                            -- Leave the peek after scrolling so it cannot focus the next window.
+                            hl.dispatch(hl.dsp.cursor.move({
+                                x = at.x + size.x / 2,
+                                y = at.y + size.y / 2,
+                            }))
+                        end
+                    end
                 end
             end
         end)
