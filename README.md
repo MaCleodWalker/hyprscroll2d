@@ -18,6 +18,7 @@ visible, so you never lose the shape of your workspace.
 - Directional window movement with collision swapping
 - Independent width and height presets
 - Visible edge peeks for neighboring rows and columns
+- A compact overview of all workspace windows
 - Per-workspace in-memory layout state
 - Omarchy bindings that fall back to the normal action outside Hyprscroll2D
 
@@ -47,8 +48,9 @@ omarchy plugin add https://github.com/kirollosatef/hyprscroll2d --enable
 ```
 
 The plugin loads Hyprscroll2D at runtime without editing your Hyprland config.
-It enables the layout only on workspace 9. Press `Super+9`, open a few windows,
-and try the controls below.
+It enables the layout on the workspace set by `workspace` in
+[`layout/config.lua`](layout/config.lua), which defaults to 9. Change that value
+and reload Hyprland to use a different workspace.
 
 Update it later with:
 
@@ -75,18 +77,20 @@ git clone https://github.com/kirollosatef/hyprscroll2d.git \
 ~/.local/share/hyprscroll2d/install.sh
 ```
 
-This alternative installer:
-
-- creates a timestamped backup of `~/.config/hypr/hyprland.lua`;
-- enables Hyprscroll2D only on workspace 9;
-- reloads Hyprland and checks for configuration errors;
-- restores the backup automatically if the new block causes an error.
-
-To use a different experimental workspace, pass its number:
+This alternative installer uses the workspace configured in
+[`layout/config.lua`](layout/config.lua) by default. Passing a workspace number
+overrides the config for this installation:
 
 ```bash
 ~/.local/share/hyprscroll2d/install.sh 8
 ```
+
+The installer:
+
+- creates a timestamped backup of `~/.config/hypr/hyprland.lua`;
+- enables Hyprscroll2D only on the configured workspace;
+- reloads Hyprland and checks for configuration errors;
+- restores the backup automatically if the new block causes an error.
 
 For a manual installation, add the following near the end of
 `~/.config/hypr/hyprland.lua`, after the Omarchy defaults and your normal
@@ -94,11 +98,12 @@ For a manual installation, add the following near the end of
 
 ```lua
 local hyprscroll2d = os.getenv("HOME") .. "/.local/share/hyprscroll2d"
+local hyprscroll2d_config = dofile(hyprscroll2d .. "/layout/config.lua")
 dofile(hyprscroll2d .. "/layout/init.lua")
 dofile(hyprscroll2d .. "/integration/omarchy.lua")
 
 -- Start safely on one experimental workspace.
-hl.workspace_rule({ workspace = "9", layout = "lua:hyprscroll2d" })
+hl.workspace_rule({ workspace = tostring(hyprscroll2d_config.workspace), layout = "lua:hyprscroll2d" })
 ```
 
 Then reload and validate the configuration:
@@ -121,14 +126,26 @@ If `hyprctl configerrors` prints nothing, the manual setup is ready.
 | Shrink window width | `Super+=` |
 | Grow window height | `Super+Shift+=` |
 | Shrink window height | `Super+Shift+-` |
+| Toggle workspace overview | `Super+M` |
+| Select the focused overview window | `Super+Enter` |
+| Exit overview | `Super+Escape` |
 
-These keys retain Omarchy's normal behavior whenever the active window is not
-using Hyprscroll2D.
+The focus, move and resize bindings retain Omarchy's normal behavior whenever
+the active window is not using Hyprscroll2D. `Super+Enter` selects the overview
+window while overview is active and otherwise keeps Omarchy's terminal action.
+
+In overview mode, every window is scaled into the viewport. Use `Super+Arrow`
+to select a window or click one directly, then press `Super+Enter` to return to
+it. `Super+M` and `Super+Escape` also exit overview mode.
+Overview resizes the actual windows, so their contents respond to the smaller
+window size according to each application's normal resize behavior. The Lua
+custom-layout API cannot uniformly scale a client's rendered pixels.
 
 ## Customize the layout
 
 Edit [`layout/config.lua`](layout/config.lua) to change:
 
+- `workspace`: workspace number that uses Hyprscroll2D (default: `9`)
 - `peek_x` and `peek_y`: visible pixels from neighboring columns and rows
 - `gap_x` and `gap_y`: spacing between cells
 - `width_steps` and `height_steps`: available size presets

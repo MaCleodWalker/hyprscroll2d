@@ -1,4 +1,7 @@
 return {
+    -- Workspace that uses the Hyprscroll2D layout.
+    workspace = 9,
+
     -- Keep a visible strip of neighboring cells around the focused window.
     peek_x = 48,
     peek_y = 48,

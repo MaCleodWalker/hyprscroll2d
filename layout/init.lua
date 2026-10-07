@@ -45,6 +45,19 @@ local function workspace_key(ctx)
     return "global"
 end
 
+_G.__hyprscroll2d_is_overview_active = function()
+    local ok, window = pcall(hl.get_active_window)
+    if not ok or not window then return false end
+
+    local workspace = safe_field(window, "workspace")
+    local id = safe_field(workspace, "id")
+    local name = safe_field(workspace, "name")
+    local state = id and workspaces["workspace:" .. tostring(id)]
+        or name and workspaces["workspace-name:" .. tostring(name)]
+        or workspaces.global
+    return state and state.overview == true or false
+end
+
 local function describe(ctx)
     local descriptors = {}
     local active_id = nil
@@ -89,7 +102,9 @@ end
 
 local function recalculate(ctx)
     local state, descriptors = context(ctx)
-    local placements = core.placements(state, ctx.area, config)
+    local placements = state.overview
+        and core.overview_placements(state, ctx.area, config)
+        or core.placements(state, ctx.area, config)
 
     for id, descriptor in pairs(descriptors) do
         local placement = placements[id]
@@ -110,6 +125,10 @@ local function layout_msg(ctx, message)
         core.pan(state, argument)
     elseif command == "follow" or command == "center" then
         core.follow(state)
+    elseif command == "overview" then
+        core.set_overview(state, not state.overview)
+    elseif command == "overview-exit" then
+        core.set_overview(state, false)
     elseif command == "resize" and argument == "width" then
         if extra ~= "grow" and extra ~= "shrink" then
             return "hyprscroll2d: resize width expects grow or shrink"
@@ -136,7 +155,15 @@ if not rawget(_G, "__hyprscroll2d_focus_subscription") then
     local ok, subscription = pcall(function()
         return hl.on("window.active", function(window)
             if window_layout_name(window) == "lua:hyprscroll2d" then
-                hl.dispatch(hl.dsp.layout("follow"))
+                local workspace = safe_field(window, "workspace")
+                local id = safe_field(workspace, "id")
+                local name = safe_field(workspace, "name")
+                local state = id and workspaces["workspace:" .. tostring(id)]
+                    or name and workspaces["workspace-name:" .. tostring(name)]
+                    or workspaces.global
+                if not (state and state.overview) then
+                    hl.dispatch(hl.dsp.layout("follow"))
+                end
             end
         end)
     end)

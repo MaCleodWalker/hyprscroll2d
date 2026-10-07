@@ -70,6 +70,28 @@ test("focus moves vertically", function()
     equal(core.focus(state, "down"), "B")
 end)
 
+test("overview fits every window and preserves arrow selection until exit", function()
+    local state = fresh({ "A", "B", "C" }, "B")
+    core.move(state, "down")
+    core.set_overview(state, true)
+    local area = { x = 0, y = 0, w = 1000, h = 800 }
+    local placements = core.overview_placements(state, area, config)
+
+    for _, placement in pairs(placements) do
+        assert(placement.x >= area.x and placement.y >= area.y)
+        assert(placement.x + placement.w <= area.x + area.w)
+        assert(placement.y + placement.h <= area.y + area.h)
+    end
+
+    local camera_col, camera_row = state.camera.col, state.camera.row
+    equal(core.focus(state, "left"), "A")
+    equal(state.camera.col, camera_col, "overview camera column")
+    equal(state.camera.row, camera_row, "overview camera row")
+    core.set_overview(state, false)
+    equal(state.camera.col, core.position_of(state, "A").col, "camera follows selected window")
+    equal(state.camera.row, core.position_of(state, "A").row, "camera follows selected window")
+end)
+
 test("width and height presets are independent", function()
     local state = fresh({ "A" }, "A")
     core.resize_width(state, config, 1)

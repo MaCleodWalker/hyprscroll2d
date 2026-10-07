@@ -4,6 +4,7 @@ local root = tests_dir:match("^(.*)/tests$") or "."
 
 local registered = nil
 local dispatched = {}
+local active_callback = nil
 
 _G.__hyprscroll2d_focus_subscription = nil
 _G.hl = {
@@ -12,8 +13,12 @@ _G.hl = {
             registered = { name = name, provider = provider }
         end,
     },
-    on = function()
+    on = function(_, callback)
+        active_callback = callback
         return true
+    end,
+    get_active_window = function()
+        return { workspace = { id = 9 } }
     end,
     dispatch = function(dispatcher)
         table.insert(dispatched, dispatcher)
@@ -67,5 +72,23 @@ assert(response == true, "height resize command was rejected")
 
 response = registered.provider.layout_msg(ctx, "resize height sideways")
 assert(type(response) == "string", "invalid resize command should return an error")
+
+response = registered.provider.layout_msg(ctx, "overview")
+assert(response == true, "overview command was rejected")
+assert(_G.__hyprscroll2d_is_overview_active(), "overview state was not exposed to keybindings")
+registered.provider.recalculate(ctx)
+assert(a.placed.x >= 0 and b.placed.x + b.placed.w <= ctx.area.w, "overview windows should fit the viewport")
+
+a.window.active = false
+b.window.active = true
+local dispatch_count = #dispatched
+active_callback(b.window)
+assert(#dispatched == dispatch_count, "mouse selection should not exit overview")
+
+response = registered.provider.layout_msg(ctx, "overview-exit")
+assert(response == true, "overview exit command was rejected")
+assert(not _G.__hyprscroll2d_is_overview_active(), "overview state remained active after exit")
+registered.provider.recalculate(ctx)
+assert(b.placed.x > a.placed.x, "overview exit should restore the normal layout")
 
 print("ok - mocked Hyprland adapter")

@@ -22,6 +22,9 @@ least 36px of an adjacent maximum-sized row or column remains visible.
 - Moving into an empty cell preserves the hole and moves the window there.
 - The camera follows focus unless the user explicitly pans it.
 - Width and height use discrete presets to prevent accidental overlaps.
+- Overview mode scales every workspace window into the viewport. Directional
+  focus or clicking a window selects it without leaving the overview; confirming
+  returns to the normal layout centered on that window.
 
 ## Intended controls
 
@@ -34,6 +37,9 @@ least 36px of an adjacent maximum-sized row or column remains visible.
 | Shrink width | `Super+=` |
 | Grow height | `Super+Shift+=` |
 | Shrink height | `Super+Shift+-` |
+| Toggle overview | `Super+M` |
+| Confirm selected window | `Super+Enter` |
+| Exit overview | `Super+Escape` |
 
 Bindings must delegate to Omarchy's original actions whenever another layout
 is active.
@@ -43,6 +49,5 @@ is active.
 1. Validate off-screen placement and animation on Hyprland 0.56.2.
 2. Add safe Omarchy bindings and an experimental workspace rule.
 3. Add state persistence across Hyprland reloads.
-4. Add an overview showing the full 2D canvas.
-5. Add mouse/touchpad camera panning.
-6. Harden groups, fullscreen, multi-monitor moves and special workspaces.
+4. Add mouse/touchpad camera panning.
+5. Harden groups, fullscreen, multi-monitor moves and special workspaces.
