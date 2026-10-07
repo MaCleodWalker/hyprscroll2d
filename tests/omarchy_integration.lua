@@ -7,6 +7,7 @@ local dispatched = {}
 local active_layout = "lua:hyprscroll2d"
 local workspace_rule = nil
 local terminal_launches = 0
+local terminal_action_creations = 0
 local overview_active = false
 _G.__hyprscroll2d_is_overview_active = function()
     return overview_active
@@ -17,6 +18,7 @@ _G.o = {
         bindings[keys] = action
     end,
     launch_terminal = function()
+        terminal_action_creations = terminal_action_creations + 1
         return function()
             terminal_launches = terminal_launches + 1
         end
@@ -42,6 +44,7 @@ _G.hl = {
     end,
     dsp = {
         layout = function(message) return { kind = "layout", message = message } end,
+        exec_cmd = function(command) return { kind = "exec", command = command } end,
         focus = function(options) return { kind = "focus", direction = options.direction } end,
         window = {
             swap = function(options) return { kind = "swap", direction = options.direction } end,
@@ -55,6 +58,7 @@ _G.hl = {
 }
 
 assert(loadfile(root .. "/integration/omarchy.lua"))()
+assert(terminal_action_creations == 1, "terminal binding should be captured during integration setup")
 
 assert(type(bindings["SUPER + LEFT"]) == "function", "left binding was not installed")
 bindings["SUPER + LEFT"]()

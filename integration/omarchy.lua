@@ -31,6 +31,8 @@ local function replace(keys, description, message, fallback)
     o.bind(keys, description, route(message, fallback))
 end
 
+local terminal_action = type(o.launch_terminal) == "function" and o.launch_terminal() or nil
+
 replace("SUPER + LEFT", "Focus left", "focus left", function()
     return hl.dsp.focus({ direction = "l" })
 end)
@@ -46,7 +48,10 @@ end)
 
 replace("SUPER + M", "Toggle 2D overview", "overview")
 replace("SUPER + RETURN", "Select overview window", "overview-exit", function()
-    o.launch_terminal()()
+    if type(terminal_action) == "function" then
+        return terminal_action()
+    end
+    return hl.dsp.exec_cmd("omarchy-launch-terminal")
 end)
 replace("SUPER + ESCAPE", "Exit 2D overview", "overview-exit")
 
