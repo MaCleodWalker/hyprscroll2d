@@ -41,6 +41,10 @@ replace("SUPER + DOWN", "Focus down", "focus down", function()
     return hl.dsp.focus({ direction = "d" })
 end)
 
+replace("SUPER + M", "Toggle 2D overview", "overview")
+replace("SUPER + RETURN", "Select overview window", "overview-exit")
+replace("SUPER + ESCAPE", "Exit 2D overview", "overview-exit")
+
 replace("SUPER + SHIFT + LEFT", "Move window left", "move left", function()
     return hl.dsp.window.swap({ direction = "l" })
 end)

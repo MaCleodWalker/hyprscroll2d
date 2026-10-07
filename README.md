@@ -18,6 +18,7 @@ visible, so you never lose the shape of your workspace.
 - Directional window movement with collision swapping
 - Independent width and height presets
 - Visible edge peeks for neighboring rows and columns
+- A compact overview of all workspace windows
 - Per-workspace in-memory layout state
 - Omarchy bindings that fall back to the normal action outside Hyprscroll2D
 
@@ -121,9 +122,17 @@ If `hyprctl configerrors` prints nothing, the manual setup is ready.
 | Shrink window width | `Super+=` |
 | Grow window height | `Super+Shift+=` |
 | Shrink window height | `Super+Shift+-` |
+| Toggle workspace overview | `Super+M` |
+| Select the focused overview window | `Super+Enter` |
+| Exit overview | `Super+Escape` |
 
-These keys retain Omarchy's normal behavior whenever the active window is not
-using Hyprscroll2D.
+The focus, move and resize bindings retain Omarchy's normal behavior whenever
+the active window is not using Hyprscroll2D. The overview shortcuts are reserved
+by Hyprscroll2D.
+
+In overview mode, every window is scaled into the viewport. Use `Super+Arrow`
+to select a window or click one directly, then press `Super+Enter` to return to
+it. `Super+M` and `Super+Escape` also exit overview mode.
 
 ## Customize the layout
 

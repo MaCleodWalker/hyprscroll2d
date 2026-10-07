@@ -41,10 +41,20 @@ bindings["SUPER + LEFT"]()
 assert(dispatched[#dispatched].kind == "layout", "2D layout did not receive focus")
 assert(dispatched[#dispatched].message == "focus left", "wrong 2D focus message")
 
+bindings["SUPER + M"]()
+assert(dispatched[#dispatched].message == "overview", "overview toggle did not reach the layout")
+bindings["SUPER + RETURN"]()
+assert(dispatched[#dispatched].message == "overview-exit", "Enter did not exit the overview")
+bindings["SUPER + ESCAPE"]()
+assert(dispatched[#dispatched].message == "overview-exit", "Escape did not exit the overview")
+
 active_layout = "scrolling"
 bindings["SUPER + LEFT"]()
 assert(dispatched[#dispatched].kind == "focus", "normal layout fallback did not run")
 assert(dispatched[#dispatched].direction == "l", "wrong normal focus direction")
+local dispatch_count = #dispatched
+bindings["SUPER + M"]()
+assert(#dispatched == dispatch_count, "overview toggle should not run in another layout")
 
 active_layout = "lua:hyprscroll2d"
 bindings["SUPER + SHIFT + code:21"]()

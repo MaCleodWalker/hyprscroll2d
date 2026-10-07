@@ -56,6 +56,7 @@ function M.new_state()
         focused_id = nil,
         observed_active_id = nil,
         camera = { col = 0, row = 0 },
+        overview = false,
     }
 end
 
@@ -168,7 +169,7 @@ function M.focus(state, direction)
     if not target then return nil end
 
     state.focused_id = target.id
-    M.follow(state)
+    if not state.overview then M.follow(state) end
     return target.id
 end
 
@@ -201,6 +202,12 @@ function M.follow(state)
     state.camera.col = focused.col
     state.camera.row = focused.row
     return true
+end
+
+function M.set_overview(state, enabled)
+    state.overview = not not enabled
+    if not state.overview then M.follow(state) end
+    return state.overview
 end
 
 function M.pan(state, direction)
@@ -296,6 +303,48 @@ function M.placements(state, area, config)
             y = row_centers[position.row] - (size.h / 2),
             w = size.w,
             h = size.h,
+        }
+    end
+
+    return placements
+end
+
+function M.overview_placements(state, area, config)
+    local min_col, max_col, min_row, max_row
+    for _, position in pairs(state.positions) do
+        min_col = math.min(min_col or position.col, position.col)
+        max_col = math.max(max_col or position.col, position.col)
+        min_row = math.min(min_row or position.row, position.row)
+        max_row = math.max(max_row or position.row, position.row)
+    end
+
+    if not min_col then return {} end
+
+    local columns = max_col - min_col + 1
+    local rows = max_row - min_row + 1
+    local padding_x = math.min(area.w * 0.04, area.w / 2)
+    local padding_y = math.min(area.h * 0.04, area.h / 2)
+    local usable_width = area.w - (padding_x * 2)
+    local usable_height = area.h - (padding_y * 2)
+    local gap_x = columns > 1 and math.min(config.gap_x or 0, usable_width / (columns - 1)) or 0
+    local gap_y = rows > 1 and math.min(config.gap_y or 0, usable_height / (rows - 1)) or 0
+    local cell_width = math.max(1, (usable_width - (gap_x * (columns - 1))) / columns)
+    local cell_height = math.max(1, (usable_height - (gap_y * (rows - 1))) / rows)
+    local placements = {}
+
+    for id, position in pairs(state.positions) do
+        local width_step = clamp(state.width_step_by_id[id] or config.default_width_step, 1, #config.width_steps)
+        local height_step = clamp(state.height_step_by_id[id] or config.default_height_step, 1, #config.height_steps)
+        local width = cell_width * config.width_steps[width_step]
+        local height = cell_height * config.height_steps[height_step]
+        local cell_x = area.x + padding_x + ((position.col - min_col) * (cell_width + gap_x))
+        local cell_y = area.y + padding_y + ((position.row - min_row) * (cell_height + gap_y))
+
+        placements[id] = {
+            x = cell_x + ((cell_width - width) / 2),
+            y = cell_y + ((cell_height - height) / 2),
+            w = width,
+            h = height,
         }
     end
 
