@@ -134,6 +134,9 @@ The focus, move and resize bindings retain Omarchy's normal behavior whenever
 the active window is not using Hyprscroll2D. `Super+Enter` selects the overview
 window while overview is active and otherwise keeps Omarchy's terminal action.
 
+Hovering a neighboring edge peek focuses that window and centers the cursor
+inside it, so one mouse movement does not scroll through the whole row or column.
+
 In overview mode, every window is scaled into the viewport. Use `Super+Arrow`
 to select a window or click one directly, then press `Super+Enter` to return to
 it. `Super+M` and `Super+Escape` also exit overview mode.
