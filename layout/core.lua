@@ -310,26 +310,38 @@ function M.placements(state, area, config)
 end
 
 function M.overview_placements(state, area, config)
-    local min_col, max_col, min_row, max_row
+    local columns, rows = {}, {}
+    local column_index, row_index = {}, {}
     for _, position in pairs(state.positions) do
-        min_col = math.min(min_col or position.col, position.col)
-        max_col = math.max(max_col or position.col, position.col)
-        min_row = math.min(min_row or position.row, position.row)
-        max_row = math.max(max_row or position.row, position.row)
+        if not column_index[position.col] then
+            column_index[position.col] = true
+            table.insert(columns, position.col)
+        end
+        if not row_index[position.row] then
+            row_index[position.row] = true
+            table.insert(rows, position.row)
+        end
     end
 
-    if not min_col then return {} end
+    if #columns == 0 then return {} end
 
-    local columns = max_col - min_col + 1
-    local rows = max_row - min_row + 1
+    table.sort(columns)
+    table.sort(rows)
+    for index, col in ipairs(columns) do column_index[col] = index end
+    for index, row in ipairs(rows) do row_index[row] = index end
+
+    local column_count = #columns
+    local row_count = #rows
     local padding_x = math.min(area.w * 0.04, area.w / 2)
     local padding_y = math.min(area.h * 0.04, area.h / 2)
     local usable_width = area.w - (padding_x * 2)
     local usable_height = area.h - (padding_y * 2)
-    local gap_x = columns > 1 and math.min(config.gap_x or 0, usable_width / (columns - 1)) or 0
-    local gap_y = rows > 1 and math.min(config.gap_y or 0, usable_height / (rows - 1)) or 0
-    local cell_width = math.max(1, (usable_width - (gap_x * (columns - 1))) / columns)
-    local cell_height = math.max(1, (usable_height - (gap_y * (rows - 1))) / rows)
+    local max_gap_x = column_count > 1 and math.max(0, (usable_width - column_count) / (column_count - 1)) or 0
+    local max_gap_y = row_count > 1 and math.max(0, (usable_height - row_count) / (row_count - 1)) or 0
+    local gap_x = column_count > 1 and math.max(0, math.min(config.gap_x or 0, max_gap_x)) or 0
+    local gap_y = row_count > 1 and math.max(0, math.min(config.gap_y or 0, max_gap_y)) or 0
+    local cell_width = (usable_width - (gap_x * (column_count - 1))) / column_count
+    local cell_height = (usable_height - (gap_y * (row_count - 1))) / row_count
     local placements = {}
 
     for id, position in pairs(state.positions) do
@@ -337,8 +349,8 @@ function M.overview_placements(state, area, config)
         local height_step = clamp(state.height_step_by_id[id] or config.default_height_step, 1, #config.height_steps)
         local width = cell_width * config.width_steps[width_step]
         local height = cell_height * config.height_steps[height_step]
-        local cell_x = area.x + padding_x + ((position.col - min_col) * (cell_width + gap_x))
-        local cell_y = area.y + padding_y + ((position.row - min_row) * (cell_height + gap_y))
+        local cell_x = area.x + padding_x + ((column_index[position.col] - 1) * (cell_width + gap_x))
+        local cell_y = area.y + padding_y + ((row_index[position.row] - 1) * (cell_height + gap_y))
 
         placements[id] = {
             x = cell_x + ((cell_width - width) / 2),
