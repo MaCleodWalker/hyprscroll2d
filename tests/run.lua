@@ -92,6 +92,43 @@ test("overview fits every window and preserves arrow selection until exit", func
     equal(state.camera.row, core.position_of(state, "A").row, "camera follows selected window")
 end)
 
+test("overview packs sparse positions into dense rows and columns", function()
+    local state = fresh({ "A", "B", "C" }, "A")
+    state.positions.A = { col = -1000, row = 50 }
+    state.positions.B = { col = 1000, row = -90 }
+    state.positions.C = { col = 1000000, row = 10000 }
+    local placements = core.overview_placements(state, { x = 0, y = 0, w = 300, h = 200 }, config)
+
+    for _, placement in pairs(placements) do
+        assert(placement.x >= 0 and placement.y >= 0)
+        assert(placement.x + placement.w <= 300)
+        assert(placement.y + placement.h <= 200)
+    end
+end)
+
+test("overview caps gaps when the viewport is too small for all cells", function()
+    local state = fresh({ "A", "B", "C", "D", "E", "F", "G", "H", "I", "J" }, "A")
+    for index, id in ipairs(state.ids) do
+        state.positions[id] = { col = index * 1000, row = index * -1000 }
+    end
+    local overview_config = {
+        width_steps = { 1 },
+        height_steps = { 1 },
+        default_width_step = 1,
+        default_height_step = 1,
+        gap_x = 1000,
+        gap_y = 1000,
+    }
+    local area = { x = 0, y = 0, w = 50, h = 40 }
+    local placements = core.overview_placements(state, area, overview_config)
+
+    for _, placement in pairs(placements) do
+        assert(placement.x >= area.x and placement.y >= area.y)
+        assert(placement.x + placement.w <= area.x + area.w)
+        assert(placement.y + placement.h <= area.y + area.h)
+    end
+end)
+
 test("width and height presets are independent", function()
     local state = fresh({ "A" }, "A")
     core.resize_width(state, config, 1)
