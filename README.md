@@ -275,8 +275,11 @@ Edit [`layout/config.lua`](layout/config.lua) (the defaults) to change:
 - `workspace` (optional): workspace number pinned to Omalattice at startup;
   unset by default, so workspaces opt in with `Super+L`
 - `peek_x` and `peek_y`: visible pixels from neighboring columns and rows
-  (default: `96` and `32`; at `0` the focused window fills the whole area)
-- `gap_x` and `gap_y`: spacing between cells
+  (default: `96` and `32`; at `0` the full-cell window fills the whole area).
+  When both the peek and gap for an axis are `0`, it reaches the display's
+  usable edges, ignoring Hyprland's outer gaps but respecting reserved bar space.
+- `gap_x` and `gap_y`: spacing between cells. At `0`, neighboring windows
+  touch without extra spacing from Hyprland's inner gaps or border.
 - `width_steps` and `height_steps`: available size presets
 - `default_width_step` and `default_height_step`: initial window dimensions
   (default: the largest preset, which fills the area left by the peeks)

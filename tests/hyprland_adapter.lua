@@ -492,6 +492,70 @@ registered.provider.recalculate(fourth)
 assert(math.abs(fourth_targets[2].placed.y - partial_y) < 0.01, "late windows moved the restored one")
 assert(fourth_targets[1].placed.y < fourth_targets[2].placed.y, "a late window did not take its saved row")
 
+-- Menu changes refresh existing windows, including zero-gap display edges.
+local edge_config = assert(real_loadfile(root .. "/layout/config.lua"))()
+edge_config.peek_x, edge_config.peek_y = 0, 0
+edge_config.gap_x, edge_config.gap_y = 0, 0
+hl.get_config = function(key)
+    if key == "general.gaps_in" then return { left = 3, top = 5, right = 9, bottom = 11 } end
+    if key == "general.border_size" then return 2 end
+end
+local edge_monitor = {
+    x = -1280, y = 100,
+    width = 1920, height = 1080, scale = 1.5, transform = 0,
+    reserved = { left = 0, top = 20, right = 0, bottom = 0 },
+}
+local edge_a, edge_b, edge_c = target("edgeA", true, 101), target("edgeB", false, 101), target("edgeC", false, 101)
+for _, item in ipairs({ edge_a, edge_b, edge_c }) do
+    item.window.workspace.monitor = edge_monitor
+end
+local edges = {
+    area = { x = -1270, y = 130, w = 1260, h = 680 },
+    targets = { edge_a, edge_b, edge_c },
+}
+dispatch_context = edges
+assert(_G.__omalattice_reload_config(edge_config))
+activate(edges, edge_c)
+assert(registered.provider.layout_msg(edges, "move down") == true)
+assert(registered.provider.layout_msg(edges, "move left") == true)
+assert(registered.provider.layout_msg(edges, "move left") == true)
+activate(edges, edge_a)
+registered.provider.recalculate(edges)
+
+local function visible_box(item)
+    local box = item.placed
+    return { x = box.x + 5, y = box.y + 7, w = box.w - 16, h = box.h - 20 }
+end
+local edge_box, right_box, below_box = visible_box(edge_a), visible_box(edge_b), visible_box(edge_c)
+assert(edge_box.x == -1280 and edge_box.y == 120, "zero peeks and gaps must remove outer margins, not bar reservations")
+assert(edge_box.w == 1280 and edge_box.h == 700, "full-cell window must fill the monitor's usable area")
+assert(right_box.x == edge_box.x + edge_box.w, "zero horizontal gap must make visible windows touch")
+assert(below_box.y == edge_box.y + edge_box.h, "zero vertical gap must make visible windows touch")
+assert(edges.area.x == -1270 and edges.area.w == 1260, "the compositor context must not be mutated")
+
+edge_config.gap_x, edge_config.gap_y = 18, 24
+assert(_G.__omalattice_reload_config(edge_config))
+edge_box, right_box, below_box = visible_box(edge_a), visible_box(edge_b), visible_box(edge_c)
+assert(right_box.x - edge_box.x - edge_box.w == 18, "menu horizontal gap must apply immediately without extra inset")
+assert(below_box.y - edge_box.y - edge_box.h == 24, "menu vertical gap must apply immediately without extra inset")
+assert(edge_box.x == edges.area.x and edge_box.y == edges.area.y, "nonzero gaps must preserve the normal outer area")
+
+edge_config.gap_x = 0
+assert(_G.__omalattice_reload_config(edge_config))
+edge_box = visible_box(edge_a)
+assert(edge_box.x == -1280 and edge_box.y == edges.area.y, "zero-gap edge expansion must be independent per axis")
+
+edge_config.gap_y = 0
+edge_monitor.transform = 1
+assert(_G.__omalattice_reload_config(edge_config))
+edge_box = visible_box(edge_a)
+assert(edge_box.w == 720 and edge_box.h == 1260, "rotated scaled monitors must use transformed logical dimensions")
+edge_monitor.scale = 1.3
+assert(_G.__omalattice_reload_config(edge_config))
+edge_box = visible_box(edge_a)
+assert(edge_box.w == 831 and edge_box.h == 1457, "fractional scaling must round like the compositor")
+dispatch_context = nil
+
 os.execute("rm -rf '" .. state_home .. "'")
 os.getenv = original_getenv
 io.open = original_open

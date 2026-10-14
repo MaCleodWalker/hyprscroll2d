@@ -57,13 +57,27 @@ local function write_overview_status(key, enabled, payload)
     return true
 end
 
--- How far a window is drawn inside its layout box: Hyprland's inner gaps and
+-- How far a window is drawn inside its placed box: Hyprland's inner gaps and
 -- the border.
-local function window_inset()
+local function window_insets()
     local ok, gaps = pcall(hl.get_config, "general.gaps_in")
-    local gap = ok and type(gaps) == "table" and tonumber(gaps.top) or (ok and tonumber(gaps)) or 0
     local border_ok, border = pcall(hl.get_config, "general.border_size")
-    return gap + (border_ok and tonumber(border) or 0)
+    border = border_ok and tonumber(border) or 0
+    local insets = {}
+    for _, side in ipairs({ "left", "top", "right", "bottom" }) do
+        local gap = ok and (type(gaps) == "table" and tonumber(gaps[side]) or tonumber(gaps)) or 0
+        insets[side] = (gap or 0) + border
+    end
+    return insets
+end
+
+local function window_frame(box, insets)
+    return {
+        x = box.x - insets.left,
+        y = box.y - insets.top,
+        w = box.w + insets.left + insets.right,
+        h = box.h + insets.top + insets.bottom,
+    }
 end
 
 -- "origins" are the windows' boxes outside the overview. The shell grows each
@@ -75,7 +89,6 @@ local function overview_payload(ctx, state, descriptors, tiles, origins)
         ',"grid":{"x":%.2f,"y":%.2f,"w":%.2f,"h":%.2f,"gapX":%.2f,"gapY":%.2f,"columns":[%s],"rows":[%s]}',
         grid.x, grid.y, grid.w, grid.h, grid.gap_x, grid.gap_y,
         table.concat(grid.columns, ","), table.concat(grid.rows, ",")) or ""
-    local inset = origins and window_inset() or 0
     local entries = {}
     for _, id in ipairs(state.ids) do
         local descriptor, tile = descriptors[id], tiles[id]
@@ -84,8 +97,7 @@ local function overview_payload(ctx, state, descriptors, tiles, origins)
             local from = ""
             if origin then
                 from = string.format(',"fx":%.2f,"fy":%.2f,"fw":%.2f,"fh":%.2f',
-                    origin.x + inset, origin.y + inset,
-                    math.max(1, origin.w - inset * 2), math.max(1, origin.h - inset * 2))
+                    origin.x, origin.y, origin.w, origin.h)
             end
             table.insert(entries, string.format('{"address":%s,"x":%.2f,"y":%.2f,"w":%.2f,"h":%.2f%s}',
                 json_string(descriptor.address), tile.x, tile.y, tile.w, tile.h, from))
@@ -143,6 +155,38 @@ local function workspace_key(ctx)
         if name then return "workspace-name:" .. tostring(name) end
     end
     return "global"
+end
+
+local function layout_context(ctx)
+    local edge_x = config.peek_x == 0 and config.gap_x == 0
+    local edge_y = config.peek_y == 0 and config.gap_y == 0
+    if not edge_x and not edge_y then return ctx end
+
+    local monitor
+    for _, target in ipairs(ctx.targets or {}) do
+        local workspace = safe_field(safe_field(target, "window"), "workspace")
+        monitor = safe_field(workspace, "monitor")
+        if monitor then break end
+    end
+    if not monitor then return ctx end
+
+    -- ctx.area excludes Hyprland's outer gaps as well as reserved layer surfaces.
+    local width, height = monitor.width, monitor.height
+    if monitor.transform % 2 == 1 then width, height = height, width end
+    local reserved = monitor.reserved
+    local area = {
+        x = ctx.area.x, y = ctx.area.y,
+        w = ctx.area.w, h = ctx.area.h,
+    }
+    if edge_x then
+        area.x = monitor.x + reserved.left
+        area.w = math.floor(width / monitor.scale + 0.5) - reserved.left - reserved.right
+    end
+    if edge_y then
+        area.y = monitor.y + reserved.top
+        area.h = math.floor(height / monitor.scale + 0.5) - reserved.top - reserved.bottom
+    end
+    return { area = area, targets = ctx.targets }
 end
 
 local function active_state()
@@ -274,6 +318,7 @@ local function save_layout(key, state, descriptors)
 end
 
 local function recalculate(ctx)
+    ctx = layout_context(ctx)
     local state, descriptors = context(ctx)
     local placements
     state.view_area = state.overview and ctx.area or nil
@@ -317,9 +362,10 @@ local function recalculate(ctx)
         end
     end
 
+    local insets = window_insets()
     for id, descriptor in pairs(descriptors) do
         local placement = placements[id]
-        if placement then descriptor.target:place(placement) end
+        if placement then descriptor.target:place(window_frame(placement, insets)) end
     end
 
     save_layout(workspace_key(ctx), state, descriptors)
@@ -336,6 +382,7 @@ local function recalculate(ctx)
 end
 
 local function layout_msg(ctx, message)
+    ctx = layout_context(ctx)
     local state, descriptors = context(ctx)
     if message:match("^overview%-drop") then
         local address, col, row, workspace = message:match(
