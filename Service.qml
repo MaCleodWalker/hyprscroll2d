@@ -13,6 +13,9 @@ Item {
     property var overview: closedOverview
     readonly property string overviewStatusPath: Quickshell.env("XDG_RUNTIME_DIR")
         + "/omalattice-overview"
+    // How far a touchpad swipe has opened the overview, written by the layout.
+    readonly property var idleSwipe: ({ progress: 0, dragging: false })
+    property var swipe: idleSwipe
     readonly property string wallpaperUrl: "file://" + Quickshell.env("HOME")
         + "/.local/state/omarchy/current/background"
     readonly property string bootstrapPath: decodeURIComponent(
@@ -49,6 +52,16 @@ Item {
             return value && typeof value === "object" ? value : root.closedOverview
         } catch (error) {
             return root.closedOverview
+        }
+    }
+
+    function parseSwipe(text) {
+        try {
+            const value = JSON.parse(text)
+            if (!value || typeof value.progress !== "number") return root.idleSwipe
+            return { progress: Math.max(0, Math.min(1, value.progress)), dragging: value.dragging === true }
+        } catch (error) {
+            return root.idleSwipe
         }
     }
 
@@ -133,9 +146,22 @@ Item {
         id: overviewStatus
         path: root.overviewStatusPath
         watchChanges: true
-        onLoaded: root.overview = root.parseOverview(text())
+        onLoaded: {
+            root.overview = root.parseOverview(text())
+            // The swipe file may appear after the shell starts, before it can be watched.
+            overviewSwipe.reload()
+        }
         onFileChanged: reload()
         onLoadFailed: root.overview = root.closedOverview
+    }
+
+    FileView {
+        id: overviewSwipe
+        path: root.overviewStatusPath + "-progress"
+        watchChanges: true
+        onLoaded: root.swipe = root.parseSwipe(text())
+        onFileChanged: reload()
+        onLoadFailed: root.swipe = root.idleSwipe
     }
 
     Variants {
@@ -157,16 +183,77 @@ Item {
                     targetScreen.width,
                     targetScreen.height
                 )
-                readonly property var overview: root.overview
-                readonly property bool workspaceMatches: !!(
-                    monitor
-                    && monitor.activeWorkspace
-                    && (overview.workspace === "workspace:" + monitor.activeWorkspace.id
-                        || overview.workspace === "workspace-name:" + monitor.activeWorkspace.name)
-                )
-                readonly property bool active: overview.overview === true && workspaceMatches
-                readonly property var tiles: active && overview.thumbnails === true && overview.tiles
+                readonly property var liveOverview: root.overview
+                // The latest overview with thumbnails, kept while it closes so they
+                // can shrink back into their windows.
+                property var shownOverview: null
+                readonly property var overview: shownOverview || liveOverview
+
+                function onThisScreen(status) {
+                    return !!(status && monitor && monitor.activeWorkspace
+                        && (status.workspace === "workspace:" + monitor.activeWorkspace.id
+                            || status.workspace === "workspace-name:" + monitor.activeWorkspace.name))
+                }
+
+                readonly property bool active: liveOverview.overview === true && onThisScreen(liveOverview)
+                readonly property bool shownHere: onThisScreen(shownOverview)
+                // A swipe sets the progress directly; otherwise it animates to open or closed.
+                readonly property bool dragging: root.swipe.dragging === true && shownHere
+                // 0 draws each window where it is, 1 draws it as its overview tile.
+                property real progress: 0
+                readonly property var tiles: shownHere && overview.thumbnails === true && overview.tiles
                     ? overview.tiles : []
+
+                function syncProgress() {
+                    if (dragging) {
+                        settle.stop()
+                        progress = root.swipe.progress
+                        return
+                    }
+                    const goal = active ? 1 : 0
+                    if (progress === goal && !settle.running) {
+                        // A swipe that ends fully closed still waits for the windows.
+                        if (!active && shownOverview) linger.restart()
+                        return
+                    }
+                    settle.to = goal
+                    settle.restart()
+                }
+
+                onLiveOverviewChanged: {
+                    // A closed status keeps its tiles on disk, so only follow it while
+                    // the overlay is still showing; a later reload must not bring it back.
+                    if (liveOverview.thumbnails === true && liveOverview.tiles
+                        && (liveOverview.overview === true || shownOverview !== null)) {
+                        shownOverview = liveOverview
+                    }
+                    syncProgress()
+                }
+                onActiveChanged: syncProgress()
+                onDraggingChanged: syncProgress()
+                onProgressChanged: if (!active && !dragging && progress <= 0) linger.restart()
+
+                Connections {
+                    target: root
+                    function onSwipeChanged() { screenOverlay.syncProgress() }
+                }
+
+                NumberAnimation {
+                    id: settle
+                    target: screenOverlay
+                    property: "progress"
+                    duration: 260
+                    easing.type: Easing.OutCubic
+                }
+
+                // The windows slide back under the closed overview, so keep covering
+                // them a moment longer.
+                Timer {
+                    id: linger
+                    interval: 160
+                    onTriggered: if (!screenOverlay.active && !screenOverlay.dragging) screenOverlay.shownOverview = null
+                }
+
                 readonly property var bars: overview.bars && overview.bars.length === 4
                     ? overview.bars : [0, 1, 0, 1]
                 // The tiled area of the screen, in this screen's coordinates.
@@ -185,7 +272,7 @@ Item {
                 }
                 exclusiveZone: -1
                 focusable: false
-                visible: active
+                visible: active || dragging || progress > 0 || linger.running
                 WlrLayershell.layer: WlrLayer.Overlay
                 WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
@@ -193,8 +280,8 @@ Item {
                 mask: Region {
                     x: screenOverlay.area.x
                     y: screenOverlay.area.y
-                    width: screenOverlay.tiles.length > 0 ? screenOverlay.area.width : 0
-                    height: screenOverlay.tiles.length > 0 ? screenOverlay.area.height : 0
+                    width: screenOverlay.active && screenOverlay.tiles.length > 0 ? screenOverlay.area.width : 0
+                    height: screenOverlay.active && screenOverlay.tiles.length > 0 ? screenOverlay.area.height : 0
                 }
 
                 Item {
@@ -226,82 +313,99 @@ Item {
                         source: screenOverlay.tiles.length > 0 ? root.wallpaperUrl : ""
                     }
 
-                    Repeater {
-                        model: screenOverlay.tiles
+                    // Each thumbnail grows out of its window as the overview opens and
+                    // shrinks back into it as it closes.
+                    Item {
+                        id: tileLayer
+                        anchors.fill: parent
 
-                        delegate: Item {
-                            id: cell
-                            required property var modelData
+                        Repeater {
+                            // Delegates are kept while the window count is unchanged, so
+                            // their captures keep running as the tiles move.
+                            model: screenOverlay.tiles.length
 
-                            readonly property var toplevel: root.toplevelFor(modelData.address, root.refreshTick)
-                            readonly property var info: toplevel && toplevel.lastIpcObject
-                                ? toplevel.lastIpcObject : null
-                            readonly property bool selected: !!Hyprland.activeToplevel
-                                && root.normalizeAddress(Hyprland.activeToplevel.address)
-                                    === root.normalizeAddress(modelData.address)
+                            delegate: Item {
+                                id: cell
+                                required property int index
 
-                            x: modelData.x - screenOverlay.overview.area.x
-                            y: modelData.y - screenOverlay.overview.area.y
-                            width: modelData.w
-                            height: modelData.h
+                                readonly property var modelData: screenOverlay.tiles[index] || ({})
+                                readonly property real t: screenOverlay.progress
+                                readonly property real fromX: modelData.fx !== undefined ? modelData.fx : modelData.x
+                                readonly property real fromY: modelData.fy !== undefined ? modelData.fy : modelData.y
+                                readonly property real fromW: modelData.fw !== undefined ? modelData.fw : modelData.w
+                                readonly property real fromH: modelData.fh !== undefined ? modelData.fh : modelData.h
+                                readonly property var toplevel: root.toplevelFor(modelData.address, root.refreshTick)
+                                readonly property var info: toplevel && toplevel.lastIpcObject
+                                    ? toplevel.lastIpcObject : null
+                                readonly property bool selected: !!Hyprland.activeToplevel
+                                    && root.normalizeAddress(Hyprland.activeToplevel.address)
+                                        === root.normalizeAddress(modelData.address)
 
-                            // The thumbnail keeps the window's proportions inside its cell.
-                            Item {
-                                id: frame
-                                readonly property real fit: shot.hasContent
-                                    && shot.sourceSize.width > 0 && shot.sourceSize.height > 0
-                                    ? Math.min(cell.width / shot.sourceSize.width, cell.height / shot.sourceSize.height)
-                                    : 0
-                                width: fit > 0 ? shot.sourceSize.width * fit : cell.width
-                                height: fit > 0 ? shot.sourceSize.height * fit : cell.height
-                                anchors.centerIn: parent
+                                x: fromX + (modelData.x - fromX) * t - screenOverlay.overview.area.x
+                                y: fromY + (modelData.y - fromY) * t - screenOverlay.overview.area.y
+                                width: fromW + (modelData.w - fromW) * t
+                                height: fromH + (modelData.h - fromH) * t
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: "#1b1e28"
-                                }
+                                // The thumbnail keeps the window's proportions inside its cell.
+                                Item {
+                                    id: frame
+                                    readonly property real fit: shot.hasContent
+                                        && shot.sourceSize.width > 0 && shot.sourceSize.height > 0
+                                        ? Math.min(cell.width / shot.sourceSize.width, cell.height / shot.sourceSize.height)
+                                        : 0
+                                    width: fit > 0 ? shot.sourceSize.width * fit : cell.width
+                                    height: fit > 0 ? shot.sourceSize.height * fit : cell.height
+                                    anchors.centerIn: parent
 
-                                ScreencopyView {
-                                    id: shot
-                                    anchors.fill: parent
-                                    live: true
-                                    captureSource: cell.toplevel ? cell.toplevel.wayland : null
-                                }
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        color: "#1b1e28"
+                                    }
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: 4
-                                    color: "transparent"
-                                    border.width: cell.selected ? 3 : 1
-                                    border.color: cell.selected ? "#e8a838" : "#55ffffff"
-                                }
+                                    ScreencopyView {
+                                        id: shot
+                                        anchors.fill: parent
+                                        live: true
+                                        captureSource: cell.toplevel ? cell.toplevel.wayland : null
+                                    }
 
-                                Rectangle {
-                                    id: titleBar
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    height: titleText.implicitHeight + 12
-                                    color: "#dd171923"
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        opacity: cell.t
+                                        radius: 4
+                                        color: "transparent"
+                                        border.width: cell.selected ? 3 : 1
+                                        border.color: cell.selected ? "#e8a838" : "#55ffffff"
+                                    }
 
-                                    Text {
-                                        id: titleText
+                                    Rectangle {
+                                        id: titleBar
                                         anchors.left: parent.left
                                         anchors.right: parent.right
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        anchors.leftMargin: 10
-                                        anchors.rightMargin: 10
-                                        text: cell.info ? cell.info.title || cell.info.class || "" : ""
-                                        color: "#f4f4f5"
-                                        font.pixelSize: 13
-                                        font.weight: Font.DemiBold
-                                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
-                                    }
-                                }
+                                        anchors.top: parent.top
+                                        height: titleText.implicitHeight + 12
+                                        opacity: cell.t
+                                        color: "#dd171923"
 
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: root.enterWindow(cell.modelData.address)
+                                        Text {
+                                            id: titleText
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            anchors.leftMargin: 10
+                                            anchors.rightMargin: 10
+                                            text: cell.info ? cell.info.title || cell.info.class || "" : ""
+                                            color: "#f4f4f5"
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: root.enterWindow(cell.modelData.address)
+                                    }
                                 }
                             }
                         }
@@ -309,6 +413,7 @@ Item {
 
                     Rectangle {
                         visible: screenOverlay.bars[3] < 1
+                        opacity: screenOverlay.progress
                         x: parent.width - width - 4
                         y: 8
                         width: 6
@@ -327,6 +432,7 @@ Item {
 
                     Rectangle {
                         visible: screenOverlay.bars[1] < 1
+                        opacity: screenOverlay.progress
                         x: 8
                         y: parent.height - height - 4
                         width: parent.width - 16

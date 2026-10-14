@@ -10,15 +10,32 @@ local cursor = nil
 local timer_callback = nil
 local timer_enabled = nil
 local overview_status = nil
+local overview_progress = nil
 local original_getenv = os.getenv
 local original_open = io.open
 
+local state_home = os.tmpname()
+os.remove(state_home)
+assert(os.execute("mkdir -p '" .. state_home .. "'"))
 os.getenv = function(name)
     if name == "XDG_RUNTIME_DIR" then return "/tmp" end
+    if name == "XDG_STATE_HOME" then return state_home end
+    if name == "OMALATTICE_CONFIG" then return state_home .. "/config.lua" end
     return original_getenv(name)
 end
+-- The cursor positions below assume 48 px peeks.
+local overrides = assert(original_open(state_home .. "/config.lua", "w"))
+overrides:write("return { peek_x = 48, peek_y = 48 }\n")
+overrides:close()
 io.open = function(path, mode)
-    assert(path == "/tmp/omalattice-overview" and mode == "w", "unexpected overview status path")
+    if path == "/tmp/omalattice-overview-progress" then
+        return {
+            write = function(_, value) overview_progress = value; return true end,
+            close = function() return true end,
+        }
+    end
+    if path ~= "/tmp/omalattice-overview" then return original_open(path, mode) end
+    assert(mode == "w", "unexpected overview status mode")
     return {
         write = function(_, value)
             overview_status = value
@@ -78,9 +95,11 @@ assert(loadfile(root .. "/layout/init.lua"))()
 assert(registered and registered.name == "omalattice", "layout did not register")
 assert(overview_status == '{"workspace":"none","overview":false}', "overview status was not reset on load")
 
-local function target(id, active, workspace)
+local function target(id, active, workspace, class, title)
     return {
         window = {
+            class = class,
+            title = title,
             stable_id = id,
             address = "0x" .. id,
             active = active,
@@ -308,6 +327,139 @@ assert(cursor.x == entered.x + entered.w / 2 and cursor.y == entered.y + entered
     "the pointer did not move into the entered window")
 dispatch_context = nil
 
+-- Three-finger swipes slide the grid with the fingers and settle on a window.
+-- Reload with thumbnails on, as configured by default.
+_G.__omalattice_layout_registered = nil
+assert(real_loadfile(root .. "/layout/init.lua"))()
+local real_active_window = hl.get_active_window
+hl.get_active_window = function() return { workspace = { id = 60 } } end
+local swipe_targets = { target("swipe1", true, 60), target("swipe2", false, 60), target("swipe3", false, 60) }
+local swipe_ctx = { area = { x = 0, y = 0, w = 1000, h = 800 }, targets = swipe_targets }
+registered.provider.recalculate(swipe_ctx)
+dispatch_context = swipe_ctx
+local gestures_api = _G.__omalattice_gestures
+-- Hyprland makes the focused window active; the mock has to do that by hand.
+local function settle(focused)
+    activate(swipe_ctx, focused)
+    registered.provider.recalculate(swipe_ctx)
+end
+local home_x = swipe_targets[1].placed.x
+local window_step = swipe_targets[2].placed.x - swipe_targets[1].placed.x
+
+local animations = true
+hl.get_config = function(key)
+    if key == "animations.enabled" then return animations end
+end
+hl.config = function(options)
+    if options.animations then animations = options.animations.enabled end
+end
+assert(gestures_api.drag_begin("x"), "the drag did not start")
+assert(animations == false, "animations should pause so the grid tracks the fingers")
+gestures_api.drag_update(150, 10)
+assert(math.abs((home_x - swipe_targets[1].placed.x) - window_step / 2) < 0.5,
+    "half a swipe distance should slide the grid half a window")
+gestures_api.drag_update(-30, 1000)
+gestures_api.drag_end(false)
+assert(dispatched[#dispatched - 1].kind == "focus" and dispatched[#dispatched - 1].window == "address:0xswipe2",
+    "a drag past the commit point should focus the next window")
+assert(animations == true, "animations should resume when the fingers lift")
+assert(math.abs(swipe_targets[2].placed.x - home_x) < 0.5, "the grid should settle on the next window")
+settle(swipe_targets[2])
+
+assert(gestures_api.drag_begin("x"))
+gestures_api.drag_update(60, 10)
+gestures_api.drag_update(1, 1000)
+gestures_api.drag_end(false)
+assert(math.abs(swipe_targets[2].placed.x - home_x) < 0.5, "a short slow drag should spring back")
+
+assert(gestures_api.drag_begin("x"))
+gestures_api.drag_update(30, 10)
+gestures_api.drag_update(30, 15)
+gestures_api.drag_end(false)
+assert(math.abs(swipe_targets[3].placed.x - home_x) < 0.5, "a flick should move to the next window")
+settle(swipe_targets[3])
+
+assert(gestures_api.drag_begin("x"))
+gestures_api.drag_update(600, 10)
+local overshoot = home_x - swipe_targets[3].placed.x
+assert(overshoot > 0 and overshoot <= 100, "the last window should resist instead of sliding away")
+gestures_api.drag_end(true)
+assert(math.abs(swipe_targets[3].placed.x - home_x) < 0.5, "a cancelled drag should spring back")
+
+-- Four-finger swipes open the overview as far as the fingers go.
+assert(not gestures_api.overview_begin("down"), "swiping down should not open the overview")
+assert(gestures_api.overview_begin("up"), "swiping up should start opening the overview")
+assert(_G.__omalattice_is_overview_active(), "the overview should open as the swipe starts")
+assert(overview_progress == '{"progress":0.0000,"dragging":true}', "the swipe should start closed")
+assert(overview_status:find('"fx":', 1, true), "tiles should say where their windows are")
+gestures_api.overview_update(-150, 10)
+assert(overview_progress == '{"progress":0.5000,"dragging":true}', "the overview should follow the fingers")
+gestures_api.overview_end(false)
+assert(_G.__omalattice_is_overview_active(), "half way should stay open")
+assert(overview_progress == '{"progress":1.0000,"dragging":false}', "the overview should finish opening")
+
+assert(gestures_api.overview_begin("down"), "swiping down should start closing the overview")
+gestures_api.overview_update(200, 10)
+gestures_api.overview_update(1, 1000)
+gestures_api.overview_end(false)
+assert(not _G.__omalattice_is_overview_active(), "the overview should close past half way")
+assert(overview_progress == '{"progress":0.0000,"dragging":false}', "the overview should finish closing")
+assert(overview_status:find('"overview":false', 1, true) and overview_status:find('"fx":', 1, true),
+    "closing should tell the shell where the windows return to")
+
+dispatch_context = nil
+hl.get_active_window = real_active_window
+
+-- A workspace's grid survives a restart: new windows are matched by class and title.
+local function restart_layout()
+    _G.__omalattice_layout_registered = nil
+    assert(real_loadfile(root .. "/layout/init.lua"))()
+end
+
+local function workspace_77(prefix, only)
+    local all = {
+        { "term", "shell" }, { "web", "docs" }, { "web", "mail" },
+    }
+    local targets = {}
+    for index, entry in ipairs(all) do
+        if not only or only[index] then
+            table.insert(targets, target(prefix .. index, index == 1, 77, entry[1], entry[2]))
+        end
+    end
+    return { area = { x = 0, y = 0, w = 1000, h = 800 }, targets = targets }, targets
+end
+
+local first, first_targets = workspace_77("first")
+registered.provider.recalculate(first)
+activate(first, first_targets[2])
+assert(registered.provider.layout_msg(first, "move down") == true, "move command was rejected")
+assert(registered.provider.layout_msg(first, "resize width grow") == true, "resize command was rejected")
+registered.provider.recalculate(first)
+local saved_docs = first_targets[2].placed
+assert(saved_docs.y > first_targets[1].placed.y, "the moved window should sit below the first")
+
+restart_layout()
+local second, second_targets = workspace_77("second")
+registered.provider.recalculate(second)
+for index = 1, 3 do
+    local old, new = first_targets[index].placed, second_targets[index].placed
+    assert(math.abs(old.x - new.x) < 0.01 and math.abs(old.y - new.y) < 0.01
+        and math.abs(old.w - new.w) < 0.01 and math.abs(old.h - new.h) < 0.01,
+        "window " .. index .. " was not restored to its saved place")
+end
+
+-- Windows that return one by one keep their saved places, gaps included.
+restart_layout()
+local third, third_targets = workspace_77("third", { [2] = true })
+registered.provider.recalculate(third)
+assert(third_targets[1].placed.y > first_targets[1].placed.y - 0.01, "a lone restored window lost its row")
+local partial_y = third_targets[1].placed.y
+local fourth, fourth_targets = workspace_77("third", nil)
+registered.provider.recalculate(fourth)
+assert(math.abs(fourth_targets[2].placed.y - partial_y) < 0.01, "late windows moved the restored one")
+assert(fourth_targets[1].placed.y < fourth_targets[2].placed.y, "a late window did not take its saved row")
+
+os.execute("rm -rf '" .. state_home .. "'")
 os.getenv = original_getenv
 io.open = original_open
 

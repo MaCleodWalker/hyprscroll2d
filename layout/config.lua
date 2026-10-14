@@ -3,9 +3,11 @@ return {
     -- enable it per workspace by rotating the layout with Super+L.
     -- workspace = 9,
 
-    -- Keep a visible strip of neighboring cells around the focused window.
-    peek_x = 48,
-    peek_y = 48,
+    -- Keep a visible strip of neighboring cells around the focused window. A
+    -- full-size window fills the screen minus these strips, so the defaults
+    -- leave it about 90% of the screen. With both at 0 it fills the whole area.
+    peek_x = 96,
+    peek_y = 32,
     gap_x = 12,
     gap_y = 12,
 
@@ -18,6 +20,16 @@ return {
     -- Number of fingers for the touchpad focus swipes: up/down always move
     -- focus, and left/right do too while an Omalattice workspace is active.
     gesture_fingers = 3,
+
+    -- Touchpad travel, in Hyprland's swipe units, that slides the grid by one
+    -- window or fully opens the overview. Swipes follow the fingers; lower is
+    -- faster. Hyprland's own workspace swipe uses 300.
+    swipe_distance = 300,
+
+    -- Number of fingers for the touchpad swipe that opens the overview (up)
+    -- and closes it (down) on an Omalattice workspace. Set to 0 to disable.
+    -- It must differ from `gesture_fingers`.
+    overview_gesture_fingers = 4,
 
     -- Set to true if you configured a horizontal workspace swipe with
     -- `gesture_fingers` fingers (the Omarchy example enables one). It then
@@ -39,10 +51,10 @@ return {
     overview_min_width = 0.25,
     overview_min_height = 0.25,
 
-    -- Window dimensions are fractions of one grid cell. The largest preset
-    -- still preserves the configured edge peeks.
+    -- Window dimensions are fractions of one grid cell, which is the area left
+    -- after the edge peeks. The largest preset fills it.
     width_steps = { 0.50, 0.67, 0.85, 1.00 },
     height_steps = { 0.50, 0.67, 0.85, 1.00 },
-    default_width_step = 2,
-    default_height_step = 3,
+    default_width_step = 4,
+    default_height_step = 4,
 }

@@ -167,7 +167,8 @@ function M.sync(state, ids, active_id, config)
         if state.overview then state.overview_follow = true end
     end
 
-    compact(state)
+    -- A restored grid keeps its gaps until the rest of its windows return.
+    if not state.defer_compact then compact(state) end
 end
 
 local function directional_metrics(origin, candidate, direction)
@@ -198,17 +199,17 @@ local function metrics_less(a, b)
     return tostring(a.id) < tostring(b.id)
 end
 
-function M.focus(state, direction)
-    if not DIRECTIONS[direction] or not state.focused_id then
-        return nil
-    end
+-- The window that focus would move to from `from_id` (default: the focused one).
+function M.neighbor(state, direction, from_id)
+    from_id = from_id or state.focused_id
+    if not DIRECTIONS[direction] or not from_id then return nil end
 
-    local origin = state.positions[state.focused_id]
+    local origin = state.positions[from_id]
     if not origin then return nil end
 
     local candidates = {}
     for id, position in pairs(state.positions) do
-        if id ~= state.focused_id then
+        if id ~= from_id then
             local metrics = directional_metrics(origin, position, direction)
             if metrics then
                 metrics.id = id
@@ -218,16 +219,20 @@ function M.focus(state, direction)
     end
 
     table.sort(candidates, metrics_less)
-    local target = candidates[1]
+    return candidates[1] and candidates[1].id or nil
+end
+
+function M.focus(state, direction)
+    local target = M.neighbor(state, direction)
     if not target then return nil end
 
-    state.focused_id = target.id
+    state.focused_id = target
     if state.overview then
         state.overview_follow = true
     else
         M.follow(state)
     end
-    return target.id
+    return target
 end
 
 function M.move(state, direction)

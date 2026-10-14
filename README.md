@@ -21,7 +21,7 @@ visible, so you never lose the shape of your workspace.
 - Independent width and height presets
 - Visible edge peeks for neighboring rows and columns
 - A live thumbnail overview of all workspace windows with titles
-- Per-workspace in-memory layout state
+- Per-workspace grid layout, saved so it survives Hyprland restarts
 - Omarchy bindings that fall back to the normal action outside Omalattice
 
 ## Status
@@ -86,13 +86,15 @@ configuration files.
 - It registers the `omalattice` layout and replaces some Omarchy keybindings
   with versions that fall back to the original action outside the layout. It
   rebinds `Super+L` to add Omalattice to the layout rotation, and adds
-  three-finger focus swipes. While an Omalattice workspace is active it also
+  three-finger grid swipes and four-finger overview swipes. While an Omalattice workspace is active it also
   switches Hyprland's `follow_mouse` to click-to-focus and focuses hovered
   windows itself after a short delay. Scroll binds are active only while an overview
   is open.
 - It stores the workspaces you rotated into the layout in
-  `~/.local/state/omalattice/workspaces` and the overview state in
-  `$XDG_RUNTIME_DIR/omalattice-overview`.
+  `~/.local/state/omalattice/workspaces`, each workspace's grid (window class,
+  title, cell and size preset) in `~/.local/state/omalattice/layouts`, and the
+  overview state in `$XDG_RUNTIME_DIR/omalattice-overview` and
+  `$XDG_RUNTIME_DIR/omalattice-overview-progress`.
 - It runs `hyprctl` and `omarchy-notification-send` locally.
 
 [Uninstalling](#uninstall) removes all of it.
@@ -163,26 +165,37 @@ If `hyprctl configerrors` prints nothing, the manual setup is ready.
 | Toggle workspace overview | `Super+M` |
 | Select the focused overview window | `Super+Enter` |
 | Exit overview | `Super+Escape` |
-| Focus a window above/below | Three-finger swipe up/down |
-| Focus a window left/right | Three-finger swipe left/right |
+| Open the overview (follows the fingers) | Four-finger swipe up |
+| Close the overview (follows the fingers) | Four-finger swipe down |
+| Slide the grid up/down to a window | Three-finger swipe up/down |
+| Slide the grid left/right to a window | Three-finger swipe left/right |
 
 The focus, move and resize bindings retain Omarchy's normal behavior whenever
 the active window is not using Omalattice. `Super+Enter` selects the overview
 window while overview is active and otherwise keeps Omarchy's terminal action.
-Three-finger swipes focus the neighboring window while Omalattice is active.
-Vertical swipes always do this. All swipes follow your touchpad's
-`natural_scroll` setting: with it on, swiping up focuses the window below and
-swiping left focuses the window to the right (the content follows your
-fingers); with it off, each swipe focuses the window in the same direction. A horizontal swipe is normally taken by
+Swipes follow your fingers. A three-finger swipe slides the whole grid as you
+move, and when you lift your fingers it settles on the nearest window, or on the
+next one after a short flick; the last window in a row or column gives a little
+and springs back. A four-finger swipe up grows the overview out of your windows
+as far as your fingers go, and a swipe down shrinks it back into them; lifting
+past half way, or flicking, finishes the move. `swipe_distance` sets how far to
+swipe for one window or the whole overview (default: `300`, the same as
+Hyprland's workspace swipe; lower is faster). In an open overview a three-finger
+swipe moves the selection one window instead.
+
+Three-finger swipes work while Omalattice is active. Vertical swipes always do
+this. All swipes follow your touchpad's `natural_scroll` setting: with it on,
+the content follows your fingers, so swiping up reveals the window below; with
+it off, the grid moves the other way. A horizontal swipe is normally taken by
 Hyprland's workspace swipe, so on an Omalattice workspace Omalattice unsets
 `hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })`
-and uses left/right focus swipes instead; it restores the workspace swipe on
+and uses its own horizontal swipe instead; it restores the workspace swipe on
 other workspaces. Hyprland cannot report which gestures exist, so this assumes
 you have that exact workspace swipe: set `workspace_swipe = false` in
-[`layout/config.lua`](layout/config.lua) if you do not, and the left/right
-focus swipes stay always on. Set `gesture_fingers` if your workspace swipe uses
+[`layout/config.lua`](layout/config.lua) if you do not, and the horizontal
+swipe stays always on. Set `gesture_fingers` if your workspace swipe uses
 a different finger count. A workspace swipe with extra options such as `scale`
-or `mods` cannot be unset and keeps priority over the left/right swipes.
+or `mods` cannot be unset and keeps priority over the horizontal swipe.
 
 Hovering a neighboring edge peek focuses that window and centers the cursor
 inside it, so one mouse movement does not scroll through the whole row or column.
@@ -219,17 +232,46 @@ uniformly scale a client's rendered pixels.
 
 ## Customize the layout
 
-Edit [`layout/config.lua`](layout/config.lua) to change:
+### Saved grids
+
+Each workspace's grid is saved whenever it changes: which cell every window
+sits in, its width and height preset and the camera position. After Hyprland
+restarts, windows are matched to their saved cells by class, preferring the same
+title, and cells wait up to 45 seconds for slow-starting apps. Delete
+`~/.local/state/omalattice/layouts` to forget them.
+
+### Bar menu
+
+The plugin adds an Omalattice widget to the Omarchy bar. Add it from the bar
+settings, then click it to change the peeks, gaps, size presets, overview and
+input options with `-`/`+` steppers and switches. Changes are saved to
+`~/.config/omalattice/config.lua` and applied to the layout straight away,
+except the input options (`hover_focus_delay`, `gesture_fingers`,
+`overview_gesture_fingers` and `workspace_swipe`), which need a Hyprland restart. The file only holds values
+that differ from the defaults, survives plugin updates and can be edited by
+hand; `OMALATTICE_CONFIG` overrides its location. It applies to plugin
+installs, not the config installer.
+
+### Config file
+
+Edit [`layout/config.lua`](layout/config.lua) (the defaults) to change:
 
 - `workspace` (optional): workspace number pinned to Omalattice at startup;
   unset by default, so workspaces opt in with `Super+L`
 - `peek_x` and `peek_y`: visible pixels from neighboring columns and rows
+  (default: `96` and `32`; at `0` the focused window fills the whole area)
 - `gap_x` and `gap_y`: spacing between cells
 - `width_steps` and `height_steps`: available size presets
 - `default_width_step` and `default_height_step`: initial window dimensions
+  (default: the largest preset, which fills the area left by the peeks)
 - `hover_focus_delay`: milliseconds the mouse must rest on a window before it
   takes focus (default: `150`; `0` disables the delay)
-- `gesture_fingers`: finger count for the focus swipes (default: `3`)
+- `gesture_fingers`: finger count for the grid swipes (default: `3`)
+- `swipe_distance`: touchpad travel, in Hyprland's swipe units, that slides the
+  grid one window or fully opens the overview (default: `300`; lower is faster)
+- `overview_gesture_fingers`: finger count for the swipe up/down that opens and
+  closes the overview on an Omalattice workspace (default: `4`; `0` disables;
+  must differ from `gesture_fingers`)
 - `workspace_swipe`: whether you have a horizontal workspace swipe for the
   left/right focus swipes to replace on Omalattice workspaces (default: `true`)
 - `overview_thumbnails`: draw live thumbnails in the overview (default: `true`)
@@ -238,7 +280,8 @@ Edit [`layout/config.lua`](layout/config.lua) to change:
 - `overview_min_width` and `overview_min_height`: smallest overview window cell,
   as a fraction of the viewport (default: `0.25`)
 
-Reload Hyprland after changing the values.
+Reload Hyprland after changing the values. Values in
+`~/.config/omalattice/config.lua` take precedence over these defaults.
 
 ## Update a config installation
 
