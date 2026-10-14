@@ -25,8 +25,8 @@ visible, so you never lose the shape of your workspace.
 ## Status
 
 `v0.2.0` is an experimental preview for Hyprland `0.56.x`. It has been
-live-tested on Hyprland `0.56.2` and is intentionally enabled on only one
-workspace during evaluation.
+live-tested on Hyprland `0.56.2`. It is opt-in per workspace: nothing changes
+until you rotate a workspace into the layout with `Super+L`.
 
 The layout uses Hyprland's Lua custom-layout API, so it does not require a
 compiled Hyprland plugin. Native Omarchy Shell packaging loads the layout and
@@ -48,9 +48,11 @@ omarchy plugin add https://github.com/kirollosatef/hyprscroll2d --enable
 ```
 
 The plugin loads Hyprscroll2D at runtime without editing your Hyprland config.
-It enables the layout on the workspace set by `workspace` in
-[`layout/config.lua`](layout/config.lua), which defaults to 9. Change that value
-and reload Hyprland to use a different workspace.
+It adds the layout to Omarchy's `Super+L` workspace layout rotation, so you can
+use it on any workspace (see [Controls](#controls)). Workspaces you rotate into
+the layout are remembered across Hyprland reloads and restarts. To pin the
+layout to one workspace at startup instead, set `workspace` in
+[`layout/config.lua`](layout/config.lua).
 
 Update it later with:
 
@@ -77,9 +79,8 @@ git clone https://github.com/kirollosatef/hyprscroll2d.git \
 ~/.local/share/hyprscroll2d/install.sh
 ```
 
-This alternative installer uses the workspace configured in
-[`layout/config.lua`](layout/config.lua) by default. Passing a workspace number
-overrides the config for this installation:
+This alternative installer does not pin a workspace by default. Passing a
+workspace number pins that workspace to the layout for this installation:
 
 ```bash
 ~/.local/share/hyprscroll2d/install.sh 8
@@ -88,7 +89,7 @@ overrides the config for this installation:
 The installer:
 
 - creates a timestamped backup of `~/.config/hypr/hyprland.lua`;
-- enables Hyprscroll2D only on the configured workspace;
+- loads Hyprscroll2D and its `Super+L` layout rotation;
 - reloads Hyprland and checks for configuration errors;
 - restores the backup automatically if the new block causes an error.
 
@@ -102,8 +103,11 @@ local hyprscroll2d_config = dofile(hyprscroll2d .. "/layout/config.lua")
 dofile(hyprscroll2d .. "/layout/init.lua")
 dofile(hyprscroll2d .. "/integration/omarchy.lua")
 
--- Start safely on one experimental workspace.
-hl.workspace_rule({ workspace = tostring(hyprscroll2d_config.workspace), layout = "lua:hyprscroll2d" })
+-- Restore workspaces that were rotated into the layout with Super+L.
+dofile(hyprscroll2d .. "/integration/workspaces.lua").restore()
+
+-- Optional: pin one workspace to the layout.
+-- hl.workspace_rule({ workspace = "9", layout = "lua:hyprscroll2d" })
 ```
 
 Then reload and validate the configuration:
@@ -126,6 +130,7 @@ If `hyprctl configerrors` prints nothing, the manual setup is ready.
 | Shrink window width | `Super+=` |
 | Grow window height | `Super+Shift+=` |
 | Shrink window height | `Super+Shift+-` |
+| Rotate workspace layout (dwindle, scrolling, Hyprscroll2D) | `Super+L` |
 | Toggle workspace overview | `Super+M` |
 | Select the focused overview window | `Super+Enter` |
 | Exit overview | `Super+Escape` |
@@ -152,7 +157,8 @@ custom-layout API cannot uniformly scale a client's rendered pixels.
 
 Edit [`layout/config.lua`](layout/config.lua) to change:
 
-- `workspace`: workspace number that uses Hyprscroll2D (default: `9`)
+- `workspace` (optional): workspace number pinned to Hyprscroll2D at startup;
+  unset by default, so workspaces opt in with `Super+L`
 - `peek_x` and `peek_y`: visible pixels from neighboring columns and rows
 - `gap_x` and `gap_y`: spacing between cells
 - `width_steps` and `height_steps`: available size presets

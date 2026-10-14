@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Show window titles on the workspace overview.
+- Add three-finger up/down swipes that focus windows in Hyprscroll2D.
+- Add Hyprscroll2D to the `Super+L` layout rotation (dwindle, scrolling,
+  Hyprscroll2D) and remember the workspaces that use it.
+- Make `workspace` in `layout/config.lua` optional instead of defaulting to 9.
+
 ## v0.2.0 - 2026-08-24
 
 - Add native installation through `omarchy plugin add`.

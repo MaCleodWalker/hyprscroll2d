@@ -1,6 +1,7 @@
 return {
-    -- Workspace that uses the Hyprscroll2D layout.
-    workspace = 9,
+    -- Optionally pin Hyprscroll2D to one workspace at startup. Leave unset to
+    -- enable it per workspace by rotating the layout with Super+L.
+    -- workspace = 9,
 
     -- Keep a visible strip of neighboring cells around the focused window.
     peek_x = 48,

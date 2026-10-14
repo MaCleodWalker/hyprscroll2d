@@ -2,11 +2,29 @@ local source = debug.getinfo(1, "S").source:sub(2)
 local tests_dir = source:match("^(.*)/[^/]+$") or "tests"
 local root = tests_dir:match("^(.*)/tests$") or "."
 
+local state_home = os.tmpname()
+os.remove(state_home)
+assert(os.execute("mkdir -p '" .. state_home .. "'"))
+local original_getenv = os.getenv
+os.getenv = function(name)
+    if name == "XDG_STATE_HOME" then return state_home end
+    return original_getenv(name)
+end
+
+local function saved_workspaces()
+    local file = io.open(state_home .. "/hyprscroll2d/workspaces", "r")
+    if not file then return "" end
+    local content = file:read("*a")
+    file:close()
+    return content
+end
+
 local bindings = {}
 local dispatched = {}
 local gestures = {}
 local active_layout = "lua:hyprscroll2d"
-local workspace_rule = nil
+local active_workspace = { id = 3, tiled_layout = "dwindle", special = false }
+local workspace_rules = {}
 local terminal_launches = 0
 local terminal_action_creations = 0
 local overview_active = false
@@ -38,7 +56,10 @@ _G.hl = {
         table.insert(gestures, spec)
     end,
     workspace_rule = function(rule)
-        workspace_rule = rule
+        table.insert(workspace_rules, rule)
+    end,
+    get_active_workspace = function()
+        return active_workspace
     end,
     get_active_window = function()
         return { layout = { name = active_layout } }
@@ -112,13 +133,58 @@ active_layout = "lua:hyprscroll2d"
 bindings["SUPER + SHIFT + code:21"]()
 assert(dispatched[#dispatched].message == "resize height grow", "wrong height resize message")
 
+local function last_exec()
+    local item = dispatched[#dispatched]
+    return item.kind == "exec" and item.command or nil
+end
+
+assert(type(bindings["SUPER + L"]) == "function", "layout rotation binding was not installed")
+
+-- dwindle -> scrolling is left to Omarchy's own toggle.
+active_workspace = { id = 3, tiled_layout = "dwindle", special = false }
+bindings["SUPER + L"]()
+assert(last_exec() == "omarchy-hyprland-workspace-layout-toggle", "dwindle should use Omarchy's toggle")
+assert(saved_workspaces() == "", "dwindle step should not save a workspace")
+
+-- scrolling -> Hyprscroll2D on the focused workspace only.
+active_workspace = { id = 3, tiled_layout = "scrolling", special = false }
+bindings["SUPER + L"]()
+assert(#workspace_rules == 1 and workspace_rules[1].workspace == "3"
+    and workspace_rules[1].layout == "lua:hyprscroll2d", "scrolling did not rotate into Hyprscroll2D")
+assert(saved_workspaces() == "3\n", "rotated workspace was not saved")
+assert(last_exec():find("omarchy-notification-send", 1, true), "rotation did not notify")
+
+-- Hyprscroll2D -> dwindle, forgetting the workspace and leaving overview first.
+active_workspace = { id = 3, tiled_layout = "lua:hyprscroll2d", special = false }
+overview_active = true
+bindings["SUPER + L"]()
+assert(dispatched[#dispatched - 1].message == "overview-exit", "overview should exit before leaving the layout")
+assert(last_exec() == "omarchy-hyprland-workspace-layout-toggle", "Hyprscroll2D should hand back to Omarchy")
+assert(saved_workspaces() == "", "workspace was not forgotten")
+overview_active = false
+
+-- Special workspaces never rotate into Hyprscroll2D.
+active_workspace = { id = -98, tiled_layout = "scrolling", special = true }
+bindings["SUPER + L"]()
+assert(last_exec() == "omarchy-hyprland-workspace-layout-toggle", "special workspace should use Omarchy's toggle")
+assert(saved_workspaces() == "", "special workspace was saved")
+
+-- The plugin restores saved workspaces and pins nothing by default.
+local workspace_file = assert(io.open(state_home .. "/hyprscroll2d/workspaces", "w"))
+workspace_file:write("5\n7\n")
+workspace_file:close()
+workspace_rules = {}
 assert(loadfile(root .. "/integration/plugin.lua"))()
+assert(#workspace_rules == 2 and workspace_rules[1].workspace == "5" and workspace_rules[2].workspace == "7",
+    "plugin did not restore saved workspaces")
+workspace_rules = {}
+assert(loadfile(root .. "/integration/plugin.lua"))()
+assert(#workspace_rules == 2, "plugin reload did not reapply saved workspaces")
+
 local config = assert(loadfile(root .. "/layout/config.lua"))()
-assert(workspace_rule and workspace_rule.workspace == tostring(config.workspace),
-    "plugin did not use the configured workspace")
-workspace_rule = nil
-assert(loadfile(root .. "/integration/plugin.lua"))()
-assert(workspace_rule and workspace_rule.workspace == tostring(config.workspace),
-    "plugin reload did not reapply the configured workspace")
+assert(config.workspace == nil, "Hyprscroll2D should not pin a workspace by default")
+
+os.getenv = original_getenv
+os.execute("rm -rf '" .. state_home .. "'")
 
 print("ok - mocked Omarchy integration")

@@ -33,6 +33,45 @@ end
 
 local terminal_action = type(o.launch_terminal) == "function" and o.launch_terminal() or nil
 
+local source = debug and debug.getinfo(1, "S").source
+if type(source) ~= "string" or source:sub(1, 1) ~= "@" then
+    error("hyprscroll2d: unable to resolve integration directory")
+end
+local workspaces = dofile(source:sub(2):match("^(.*)/[^/]*$") .. "/workspaces.lua")
+
+local TOGGLE_LAYOUT = "omarchy-hyprland-workspace-layout-toggle"
+-- Same icon Omarchy uses when it announces a workspace layout change.
+local LAYOUT_ICON = "\243\177\130\172"
+
+-- Extends Omarchy's dwindle <-> scrolling toggle into
+-- dwindle -> scrolling -> Hyprscroll2D -> dwindle for the focused workspace.
+local function rotate_layout()
+    local ok, workspace = pcall(hl.get_active_workspace)
+    local id = ok and safe_field(workspace, "id") or nil
+    local current = ok and safe_field(workspace, "tiled_layout") or nil
+
+    if current == "scrolling" and not safe_field(workspace, "special") and id then
+        if workspaces.add(id) then
+            workspaces.apply(id)
+            hl.dispatch(hl.dsp.exec_cmd(
+                "omarchy-notification-send -g " .. LAYOUT_ICON .. " 'Workspace layout set to hyprscroll2d'"
+            ))
+            return
+        end
+    elseif current == workspaces.LAYOUT and id then
+        local overview_active = rawget(_G, "__hyprscroll2d_is_overview_active")
+        if overview_active and overview_active() then
+            hl.dispatch(hl.dsp.layout("overview-exit"))
+        end
+        workspaces.remove(id)
+    end
+
+    hl.dispatch(hl.dsp.exec_cmd(TOGGLE_LAYOUT))
+end
+
+hl.unbind("SUPER + L")
+o.bind("SUPER + L", "Toggle workspace layout", rotate_layout)
+
 replace("SUPER + LEFT", "Focus left", "focus left", function()
     return hl.dsp.focus({ direction = "l" })
 end)

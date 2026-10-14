@@ -73,8 +73,11 @@ cp -p -- "$config_file" "$backup_file"
   if [ -n "$workspace_override" ]; then
     printf '  hyprscroll2d_config.workspace = %s\n' "$workspace_override"
   fi
-  printf '  assert(type(hyprscroll2d_config.workspace) == "number" and hyprscroll2d_config.workspace >= 1 and hyprscroll2d_config.workspace %% 1 == 0, "hyprscroll2d: config.workspace must be a positive integer")\n'
-  printf '  hl.workspace_rule({ workspace = tostring(hyprscroll2d_config.workspace), layout = "lua:hyprscroll2d" })\n'
+  printf '  if hyprscroll2d_config.workspace ~= nil then\n'
+  printf '    assert(type(hyprscroll2d_config.workspace) == "number" and hyprscroll2d_config.workspace >= 1 and hyprscroll2d_config.workspace %% 1 == 0, "hyprscroll2d: config.workspace must be a positive integer")\n'
+  printf '    hl.workspace_rule({ workspace = tostring(hyprscroll2d_config.workspace), layout = "lua:hyprscroll2d" })\n'
+  printf '  end\n'
+  printf '  dofile(hyprscroll2d .. "/integration/workspaces.lua").restore()\n'
   printf 'end\n'
   printf '%s\n' "$end_marker"
 } >> "$config_file"
@@ -103,7 +106,7 @@ fi
 if [ -n "$workspace_override" ]; then
   printf 'Installed Hyprscroll2D on workspace %s.\n' "$workspace_override"
 else
-  printf 'Installed Hyprscroll2D using the workspace configured in layout/config.lua.\n'
+  printf 'Installed Hyprscroll2D. Press Super+L on any workspace to rotate it into the layout.\n'
 fi
 printf 'Config backup: %s\n' "$backup_file"
-printf 'Open a window on the configured workspace and use Super+Arrow to explore.\n'
+printf 'Use Super+Arrow in a Hyprscroll2D workspace to explore.\n'
