@@ -8,6 +8,8 @@
 - Add Hyprscroll2D to the `Super+L` layout rotation (dwindle, scrolling,
   Hyprscroll2D) and remember the workspaces that use it.
 - Make `workspace` in `layout/config.lua` optional instead of defaulting to 9.
+- Close up empty columns and rows when windows close or move, so the grid has
+  no blank space between windows.
 - Keep overview windows at least a quarter of the viewport in size and scroll
   larger workspaces with scroll bars, wheel scrolling and selection follow.
 

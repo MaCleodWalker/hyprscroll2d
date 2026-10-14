@@ -206,9 +206,8 @@ for index, direction in ipairs({ "right", "left", "down", "up" }) do
             for _ = 1, i - 1 do
                 registered.provider.layout_msg(context, "move down")
             end
-            for _ = 1, i - 1 do
-                registered.provider.layout_msg(context, "move left")
-            end
+            -- Gaps close up, so the next window is always one column from the stack.
+            registered.provider.layout_msg(context, "move left")
         end
     end
     activate(context, items[forward and 1 or 4])

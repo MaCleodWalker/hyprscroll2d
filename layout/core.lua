@@ -47,6 +47,54 @@ local function first_id(state)
     return state.ids[1]
 end
 
+-- Closes up empty columns or rows so the grid never has a blank band between
+-- windows. The camera keeps pointing at the same place: an occupied line keeps
+-- its window, an empty one inside the grid moves to the next window, and one
+-- beyond the edge keeps its distance from the edge.
+local function compact_axis(state, axis, camera_axis)
+    local used, seen = {}, {}
+    for _, position in pairs(state.positions) do
+        local value = position[axis]
+        if not seen[value] then
+            seen[value] = true
+            table.insert(used, value)
+        end
+    end
+    if #used == 0 then return end
+
+    table.sort(used)
+    local index = {}
+    local changed = false
+    for i, value in ipairs(used) do
+        index[value] = i - 1
+        if value ~= i - 1 then changed = true end
+    end
+    if not changed then return end
+
+    local camera = state.camera[camera_axis]
+    if index[camera] ~= nil then
+        camera = index[camera]
+    elseif camera < used[1] then
+        camera = camera - used[1]
+    elseif camera > used[#used] then
+        camera = (#used - 1) + (camera - used[#used])
+    else
+        local before = 0
+        for _, value in ipairs(used) do
+            if value < camera then before = before + 1 end
+        end
+        camera = before
+    end
+    state.camera[camera_axis] = camera
+
+    for _, position in pairs(state.positions) do position[axis] = index[position[axis]] end
+end
+
+local function compact(state)
+    compact_axis(state, "col", "col")
+    compact_axis(state, "row", "row")
+end
+
 function M.new_state()
     return {
         ids = {},
@@ -118,6 +166,8 @@ function M.sync(state, ids, active_id, config)
         state.camera.row = focused.row
         if state.overview then state.overview_follow = true end
     end
+
+    compact(state)
 end
 
 local function directional_metrics(origin, candidate, direction)
@@ -199,6 +249,7 @@ function M.move(state, direction)
         focused.row = destination_row
     end
 
+    compact(state)
     M.follow(state)
     return true
 end
