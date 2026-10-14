@@ -264,11 +264,12 @@ end)
 
 test("width and height presets are independent", function()
     local state = fresh({ "A" }, "A")
-    core.resize_width(state, config, 1)
+    core.resize_width(state, config, -1)
+    core.resize_height(state, config, -1)
     core.resize_height(state, config, -1)
     local width_step, height_step = core.size_steps_of(state, "A")
-    equal(width_step, 3)
-    equal(height_step, 2)
+    equal(width_step, config.default_width_step - 1)
+    equal(height_step, config.default_height_step - 2)
 end)
 
 test("resize clamps at preset boundaries", function()
@@ -281,6 +282,18 @@ test("resize clamps at preset boundaries", function()
     equal(width_step, #config.width_steps)
 end)
 
+test("without peeks the largest preset fills the whole area", function()
+    local state = fresh({ "A" }, "A")
+    local flat = {}
+    for key, value in pairs(config) do flat[key] = value end
+    flat.peek_x, flat.peek_y = 0, 0
+    local placements = core.placements(state, { x = 10, y = 20, w = 1000, h = 800 }, flat)
+    equal(placements.A.x, 10)
+    equal(placements.A.y, 20)
+    equal(placements.A.w, 1000)
+    equal(placements.A.h, 800)
+end)
+
 test("maximum cell leaves horizontal and vertical peeks", function()
     local state = fresh({ "A", "B" }, "A")
     state.width_step_by_id.A = #config.width_steps
@@ -291,7 +304,10 @@ test("maximum cell leaves horizontal and vertical peeks", function()
     core.move(state, "down")
     state.focused_id = "A"
     core.follow(state)
-    local placements = core.placements(state, { x = 0, y = 0, w = 1000, h = 800 }, config)
+    local peek_config = {}
+    for key, value in pairs(config) do peek_config[key] = value end
+    peek_config.peek_x, peek_config.peek_y, peek_config.gap_y = 48, 48, 12
+    local placements = core.placements(state, { x = 0, y = 0, w = 1000, h = 800 }, peek_config)
     equal(placements.A.x, 48)
     equal(placements.A.y, 48)
     equal(placements.A.w, 904)
@@ -332,7 +348,8 @@ test("closing a window closes the gap it leaves", function()
     equal(core.position_of(state, "C").col, 1, "survivor should close up against its neighbor")
 
     local placements = core.placements(state, { x = 0, y = 0, w = 1000, h = 800 }, config)
-    equal(placements.C.x - (placements.A.x + placements.A.w), config.gap_x, "blank space between windows")
+    local blank = placements.C.x - (placements.A.x + placements.A.w)
+    assert(math.abs(blank - config.gap_x) < 0.001, "blank space between windows: " .. blank)
 end)
 
 test("moving a window out of a column closes the empty column", function()

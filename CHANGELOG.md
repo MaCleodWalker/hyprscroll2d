@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Make the touchpad swipes follow the fingers: three-finger swipes slide the
+  grid and settle on a window, and four-finger swipes grow the overview out of
+  the windows and shrink it back (`swipe_distance`).
+- Animate the overview opening and closing from the windows' own positions.
+- Add a four-finger swipe up/down that opens and closes the overview
+  (`overview_gesture_fingers`).
+- Save each workspace's grid (cells, size presets and camera) and restore it after
+  Hyprland restarts by matching windows on class and title.
+- Make windows fill the area left by the edge peeks by default and raise the
+  default peeks so they are about 90% of the screen. With both peeks at 0 a
+  window fills the whole area.
+- Add an Omarchy bar menu for editing the layout settings. It saves overrides
+  to `~/.config/omalattice/config.lua` and applies most of them without
+  restarting Hyprland.
 - Pan a scrollable overview automatically when the mouse is near the edge of
   the viewport (`overview_autoscroll_speed`).
 - Make clicking an overview thumbnail enter that window and close the overview.

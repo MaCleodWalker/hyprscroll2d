@@ -8,6 +8,11 @@ local root_dir = integration_dir and integration_dir:match("^(.*)/integration$")
 if not root_dir then error("omalattice: invalid plugin directory") end
 
 local config = dofile(root_dir .. "/layout/config.lua")
+local settings = dofile(root_dir .. "/layout/settings.lua")
+local _, defaults = settings.apply(config)
+local ok, publish_err = settings.publish(config, defaults)
+if not ok then io.stderr:write("omalattice: unable to publish settings: " .. tostring(publish_err) .. "\n") end
+
 local pinned = config.workspace
 if pinned ~= nil and (type(pinned) ~= "number" or pinned < 1 or pinned % 1 ~= 0) then
     error("omalattice: config.workspace must be a positive integer")
@@ -27,6 +32,9 @@ local function apply_workspaces()
 end
 
 if rawget(_G, "__omalattice_plugin_loaded") then
+    -- A reload picks up edited settings without restarting Hyprland.
+    local reload = rawget(_G, "__omalattice_reload_config")
+    if reload then reload(config) end
     apply_workspaces()
     return true
 end

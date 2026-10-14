@@ -40,7 +40,9 @@ if type(source) ~= "string" or source:sub(1, 1) ~= "@" then
 end
 local integration_dir = source:sub(2):match("^(.*)/[^/]*$")
 local workspaces = dofile(integration_dir .. "/workspaces.lua")
-local config = dofile(integration_dir:match("^(.*)/integration$") .. "/layout/config.lua")
+local layout_dir = integration_dir:match("^(.*)/integration$") .. "/layout"
+local config = dofile(layout_dir .. "/config.lua")
+dofile(layout_dir .. "/settings.lua").apply(config)
 
 local TOGGLE_LAYOUT = "omarchy-hyprland-workspace-layout-toggle"
 -- Same icon Omarchy uses when it announces a workspace layout change.
@@ -145,31 +147,96 @@ local function natural_scroll()
     return ok and value == true
 end
 
-local function swipe_focus(swipe, natural_target)
-    return function()
-        return "focus " .. (natural_scroll() and natural_target or swipe)
-    end
+local function layout_gestures()
+    return rawget(_G, "__omalattice_gestures")
 end
 
-hl.gesture({
-    fingers = GESTURE_FINGERS,
-    direction = "up",
-    action = route(swipe_focus("up", "down")),
-})
-hl.gesture({
-    fingers = GESTURE_FINGERS,
-    direction = "down",
-    action = route(swipe_focus("down", "up")),
-})
+local function gesture_delta(event, axis)
+    local delta = type(event) == "table" and type(event.delta) == "table" and tonumber(event.delta[axis])
+    return delta or 0
+end
 
--- Hyprland has a single gesture per direction and no fallback, and a horizontal
--- swipe is normally taken by the workspace swipe. Swap it for left/right focus
--- gestures while an Omalattice workspace is active, then restore it. Hyprland
+-- Three-finger swipes follow the fingers: the grid slides with them and settles
+-- on a window when they lift. In an open overview, or if the layout cannot
+-- drag, the swipe moves focus one window when it ends instead.
+local function drag_gesture(axis)
+    local dragging, total, sign = false, 0, 1
+    return {
+        start = function()
+            total = 0
+            sign = natural_scroll() and -1 or 1
+            local api = layout_gestures()
+            dragging = is_omalattice_active() and api ~= nil and api.drag_begin(axis) == true
+        end,
+        update = function(event)
+            local delta = gesture_delta(event, axis) * sign
+            total = total + delta
+            if dragging then layout_gestures().drag_update(delta, event.time_ms) end
+        end,
+        finish = function(event)
+            local cancelled = type(event) == "table" and event.cancelled == true
+            if dragging then
+                dragging = false
+                layout_gestures().drag_end(cancelled)
+            elseif total ~= 0 and not cancelled then
+                local forward = total > 0
+                local direction = axis == "x" and (forward and "right" or "left") or (forward and "down" or "up")
+                route("focus " .. direction)()
+            end
+        end,
+    }
+end
+
+hl.gesture({ fingers = GESTURE_FINGERS, direction = "vertical", action = drag_gesture("y") })
+
+-- A swipe up opens the overview and a swipe down closes it, following the
+-- fingers. They only act on an Omalattice workspace, and are skipped when the
+-- finger count would collide with the three-finger swipes.
+local function overview_gesture()
+    local driven, total, direction = false, 0, nil
+    return {
+        start = function(event)
+            total = 0
+            direction = type(event) == "table" and tostring(event.direction or ""):lower() or ""
+            local api = layout_gestures()
+            driven = is_omalattice_active() and api ~= nil and api.overview_begin(direction) == true
+        end,
+        update = function(event)
+            local delta = gesture_delta(event, "y")
+            total = total + delta
+            if driven then layout_gestures().overview_update(delta, event.time_ms) end
+        end,
+        finish = function(event)
+            local cancelled = type(event) == "table" and event.cancelled == true
+            if driven then
+                driven = false
+                layout_gestures().overview_end(cancelled)
+                return
+            end
+            -- Without the layout's gesture support, open or close in one step.
+            if cancelled or total == 0 or not is_omalattice_active() then return end
+            local overview_active = rawget(_G, "__omalattice_is_overview_active")
+            local open = overview_active ~= nil and overview_active() == true
+            local want_open = total < 0
+            if open ~= want_open then
+                hl.dispatch(hl.dsp.layout(want_open and "overview" or "overview-exit"))
+            end
+        end,
+    }
+end
+
+local OVERVIEW_FINGERS = config.overview_gesture_fingers
+if type(OVERVIEW_FINGERS) == "number" and OVERVIEW_FINGERS > 0 and OVERVIEW_FINGERS ~= GESTURE_FINGERS then
+    hl.gesture({ fingers = OVERVIEW_FINGERS, direction = "vertical", action = overview_gesture() })
+end
+
+-- Hyprland has a single gesture per axis and no fallback, and a horizontal
+-- swipe is normally taken by the workspace swipe. Swap it for the horizontal
+-- grid swipe while an Omalattice workspace is active, then restore it. Hyprland
 -- cannot report which gestures exist and logs an error for removing a missing
 -- one, so this only happens when config.workspace_swipe says there is one.
 local focus_gestures = {
-    { fingers = GESTURE_FINGERS, direction = "left", action = route(swipe_focus("left", "right")) },
-    { fingers = GESTURE_FINGERS, direction = "right", action = route(swipe_focus("right", "left")) },
+    { fingers = GESTURE_FINGERS, direction = "horizontal", action = drag_gesture("x") },
 }
 local workspace_gesture = { fingers = GESTURE_FINGERS, direction = "horizontal", action = "workspace" }
 local swap_workspace_swipe = config.workspace_swipe ~= false

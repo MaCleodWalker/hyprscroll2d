@@ -7,10 +7,28 @@
   "license": "MIT",
   "description": "A two-dimensional scrolling workspace layout for Omarchy with a live thumbnail overview, minimum-size scrolling and Super+L rotation.",
   "kinds": [
-    "service"
+    "service",
+    "bar-widget"
   ],
   "keepLoaded": true,
   "entryPoints": {
-    "service": "Service.qml"
+    "service": "Service.qml",
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "Omalattice",
+    "description": "Menu for editing the Omalattice layout settings: peeks, gaps, size presets, overview and input options.",
+    "category": "Layout",
+    "aliases": [
+      "omalattice",
+      "layout",
+      "scrolling",
+      "grid",
+      "settings"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {},
+    "schema": []
   }
 }

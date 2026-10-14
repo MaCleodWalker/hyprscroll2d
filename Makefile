@@ -1,10 +1,14 @@
 .PHONY: test check
 
+# Keep the tests independent of the user's own overrides.
+test: export OMALATTICE_CONFIG := /nonexistent/omalattice/config.lua
 test:
 	lua tests/run.lua
 	lua tests/hyprland_adapter.lua
 	lua tests/omarchy_integration.lua
 	lua tests/hover.lua
+	lua tests/settings.lua
+	lua tests/persist.lua
 	bash tests/installer.sh
 
 check: test
@@ -12,4 +16,5 @@ check: test
 	bash -n install.sh uninstall.sh tests/installer.sh
 	python3 -m json.tool manifest.json >/dev/null
 	test -f Service.qml
+	test -f Widget.qml
 	@if command -v omarchy >/dev/null 2>&1; then omarchy plugin validate .; fi
