@@ -17,6 +17,29 @@ end
 local config = load_relative("config.lua")
 local core = load_relative("core.lua")
 local workspaces = {}
+local overview_status_path = os.getenv("XDG_RUNTIME_DIR")
+    and (os.getenv("XDG_RUNTIME_DIR") .. "/hyprscroll2d-overview")
+
+local function write_overview_status(key, enabled)
+    if not overview_status_path then
+        return nil, "XDG_RUNTIME_DIR is not set"
+    end
+
+    local file, err = io.open(overview_status_path, "w")
+    if not file then return nil, err end
+    local ok, write_err = file:write(key .. "|" .. (enabled and "true" or "false"))
+    local closed, close_err = file:close()
+    if not ok then return nil, write_err end
+    if not closed then return nil, close_err end
+    return true
+end
+
+if overview_status_path then
+    local ok, err = write_overview_status("none", false)
+    if not ok then
+        io.stderr:write("hyprscroll2d: unable to reset overview status: " .. tostring(err) .. "\n")
+    end
+end
 
 local function safe_field(value, field)
     if value == nil then return nil end
@@ -126,8 +149,13 @@ local function layout_msg(ctx, message)
     elseif command == "follow" or command == "center" then
         core.follow(state)
     elseif command == "overview" then
-        core.set_overview(state, not state.overview)
+        local enabled = not state.overview
+        local ok, err = write_overview_status(workspace_key(ctx), enabled)
+        if not ok then return "hyprscroll2d: unable to update overview status: " .. tostring(err) end
+        core.set_overview(state, enabled)
     elseif command == "overview-exit" then
+        local ok, err = write_overview_status(workspace_key(ctx), false)
+        if not ok then return "hyprscroll2d: unable to update overview status: " .. tostring(err) end
         core.set_overview(state, false)
     elseif command == "resize" and argument == "width" then
         if extra ~= "grow" and extra ~= "shrink" then

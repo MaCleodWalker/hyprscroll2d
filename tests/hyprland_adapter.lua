@@ -7,6 +7,26 @@ local dispatched = {}
 local active_callback = nil
 local dispatch_context = nil
 local cursor = nil
+local overview_status = nil
+local original_getenv = os.getenv
+local original_open = io.open
+
+os.getenv = function(name)
+    if name == "XDG_RUNTIME_DIR" then return "/tmp" end
+    return original_getenv(name)
+end
+io.open = function(path, mode)
+    assert(path == "/tmp/hyprscroll2d-overview" and mode == "w", "unexpected overview status path")
+    return {
+        write = function(_, value)
+            overview_status = value
+            return true
+        end,
+        close = function()
+            return true
+        end,
+    }
+end
 
 _G.__hyprscroll2d_focus_subscription = nil
 _G.hl = {
@@ -49,6 +69,7 @@ _G.hl = {
 
 assert(loadfile(root .. "/layout/init.lua"))()
 assert(registered and registered.name == "hyprscroll2d", "layout did not register")
+assert(overview_status == "none|false", "overview status was not reset on load")
 
 local function target(id, active, workspace)
     return {
@@ -93,6 +114,7 @@ assert(type(response) == "string", "invalid resize command should return an erro
 response = registered.provider.layout_msg(ctx, "overview")
 assert(response == true, "overview command was rejected")
 assert(_G.__hyprscroll2d_is_overview_active(), "overview state was not exposed to keybindings")
+assert(overview_status == "workspace:9|true", "overview status was not published")
 registered.provider.recalculate(ctx)
 assert(a.placed.x >= 0 and b.placed.x + b.placed.w <= ctx.area.w, "overview windows should fit the viewport")
 
@@ -105,6 +127,7 @@ assert(#dispatched == dispatch_count, "mouse selection should not exit overview"
 response = registered.provider.layout_msg(ctx, "overview-exit")
 assert(response == true, "overview exit command was rejected")
 assert(not _G.__hyprscroll2d_is_overview_active(), "overview state remained active after exit")
+assert(overview_status == "workspace:9|false", "overview exit status was not published")
 registered.provider.recalculate(ctx)
 assert(b.placed.x > a.placed.x, "overview exit should restore the normal layout")
 
@@ -170,5 +193,8 @@ end
 dispatch_count = #dispatched
 active_callback({ layout = { name = "dwindle" } })
 assert(#dispatched == dispatch_count, "other layouts should not move the cursor")
+
+os.getenv = original_getenv
+io.open = original_open
 
 print("ok - mocked Hyprland adapter")

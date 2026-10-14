@@ -18,7 +18,7 @@ visible, so you never lose the shape of your workspace.
 - Directional window movement with collision swapping
 - Independent width and height presets
 - Visible edge peeks for neighboring rows and columns
-- A compact overview of all workspace windows
+- A compact overview of all workspace windows with title labels
 - Per-workspace in-memory layout state
 - Omarchy bindings that fall back to the normal action outside Hyprscroll2D
 
@@ -137,9 +137,10 @@ window while overview is active and otherwise keeps Omarchy's terminal action.
 Hovering a neighboring edge peek focuses that window and centers the cursor
 inside it, so one mouse movement does not scroll through the whole row or column.
 
-In overview mode, every window is scaled into the viewport. Use `Super+Arrow`
-to select a window or click one directly, then press `Super+Enter` to return to
-it. `Super+M` and `Super+Escape` also exit overview mode.
+In overview mode, every window is scaled into the viewport and labeled with its
+title. Use `Super+Arrow` to select a window or click one directly, then press
+`Super+Enter` to return to it. `Super+M` and `Super+Escape` also exit overview
+mode.
 Overview resizes the actual windows, so their contents respond to the smaller
 window size according to each application's normal resize behavior. The Lua
 custom-layout API cannot uniformly scale a client's rendered pixels.
