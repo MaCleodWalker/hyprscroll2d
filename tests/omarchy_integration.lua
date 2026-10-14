@@ -4,6 +4,7 @@ local root = tests_dir:match("^(.*)/tests$") or "."
 
 local bindings = {}
 local dispatched = {}
+local gestures = {}
 local active_layout = "lua:hyprscroll2d"
 local workspace_rule = nil
 local terminal_launches = 0
@@ -33,6 +34,9 @@ _G.hl = {
         return true
     end,
     unbind = function() end,
+    gesture = function(spec)
+        table.insert(gestures, spec)
+    end,
     workspace_rule = function(rule)
         workspace_rule = rule
     end,
@@ -59,6 +63,9 @@ _G.hl = {
 
 assert(loadfile(root .. "/integration/omarchy.lua"))()
 assert(terminal_action_creations == 1, "terminal binding should be captured during integration setup")
+assert(#gestures == 2, "three-finger vertical focus gestures were not installed")
+assert(gestures[1].fingers == 3 and gestures[1].direction == "up", "wrong upward focus gesture")
+assert(gestures[2].fingers == 3 and gestures[2].direction == "down", "wrong downward focus gesture")
 
 assert(type(bindings["SUPER + LEFT"]) == "function", "left binding was not installed")
 bindings["SUPER + LEFT"]()
@@ -87,6 +94,19 @@ bindings["SUPER + M"]()
 assert(#dispatched == dispatch_count, "overview toggle should not run in another layout")
 bindings["SUPER + RETURN"]()
 assert(terminal_launches == 2, "Enter should launch the Omarchy terminal outside Hyprscroll2D")
+
+active_layout = "lua:hyprscroll2d"
+gestures[1].action()
+assert(dispatched[#dispatched].kind == "layout", "up gesture did not focus in Hyprscroll2D")
+assert(dispatched[#dispatched].message == "focus up", "up gesture sent the wrong layout command")
+gestures[2].action()
+assert(dispatched[#dispatched].message == "focus down", "down gesture sent the wrong layout command")
+
+active_layout = "scrolling"
+local gesture_dispatch_count = #dispatched
+gestures[1].action()
+gestures[2].action()
+assert(#dispatched == gesture_dispatch_count, "vertical gestures should not affect other layouts")
 
 active_layout = "lua:hyprscroll2d"
 bindings["SUPER + SHIFT + code:21"]()

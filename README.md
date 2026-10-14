@@ -129,10 +129,13 @@ If `hyprctl configerrors` prints nothing, the manual setup is ready.
 | Toggle workspace overview | `Super+M` |
 | Select the focused overview window | `Super+Enter` |
 | Exit overview | `Super+Escape` |
+| Focus a window above/below | Three-finger swipe up/down |
 
 The focus, move and resize bindings retain Omarchy's normal behavior whenever
 the active window is not using Hyprscroll2D. `Super+Enter` selects the overview
 window while overview is active and otherwise keeps Omarchy's terminal action.
+Three-finger vertical swipes focus the window above or below while Hyprscroll2D
+is active; the normal left/right workspace swipe remains unchanged.
 
 Hovering a neighboring edge peek focuses that window and centers the cursor
 inside it, so one mouse movement does not scroll through the whole row or column.

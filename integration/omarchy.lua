@@ -77,6 +77,17 @@ end)
 replace("SUPER + CTRL + UP", "Pan 2D canvas up", "pan up")
 replace("SUPER + CTRL + DOWN", "Pan 2D canvas down", "pan down")
 
+hl.gesture({
+    fingers = 3,
+    direction = "up",
+    action = route("focus up"),
+})
+hl.gesture({
+    fingers = 3,
+    direction = "down",
+    action = route("focus down"),
+})
+
 replace("SUPER + code:20", "Grow window width", "resize width grow", function()
     return hl.dsp.window.resize({ x = -100, y = 0, relative = true })
 end)
