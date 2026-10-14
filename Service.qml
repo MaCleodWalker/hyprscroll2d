@@ -303,7 +303,7 @@ Item {
                 exclusiveZone: -1
                 focusable: false
                 visible: active || dragging || progress > 0 || linger.running
-                WlrLayershell.layer: WlrLayer.Overlay
+                WlrLayershell.layer: WlrLayer.Top
                 WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
                 // Only the thumbnail area takes input, and only while thumbnails are drawn.
