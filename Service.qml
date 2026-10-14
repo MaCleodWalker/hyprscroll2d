@@ -186,9 +186,9 @@ Item {
                             ? Math.max(1, Math.min(
                                 windowData.size[0] - 16,
                                 screenOverlay.screenGeometry.width - 16,
-                                titleText.implicitWidth + 24
+                                titleMeasure.implicitWidth + 24
                             )) : 1
-                        height: 30
+                        height: titleText.implicitHeight + 16
                         visible: !!windowData
                             && windowData.mapped !== false
                             && intersectsScreen
@@ -196,17 +196,26 @@ Item {
                         radius: 5
                         color: "#dd171923"
 
+                        // Unwrapped copy used only to size the label to its text.
+                        Text {
+                            id: titleMeasure
+                            visible: false
+                            text: titleText.text
+                            font: titleText.font
+                        }
+
                         Text {
                             id: titleText
-                            anchors.fill: parent
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
                             anchors.leftMargin: 10
                             anchors.rightMargin: 10
-                            verticalAlignment: Text.AlignVCenter
                             text: windowData ? windowData.title || windowData.class || "" : ""
                             color: "#f4f4f5"
                             font.pixelSize: 13
                             font.weight: Font.DemiBold
-                            elide: Text.ElideRight
+                            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                         }
                     }
                 }
