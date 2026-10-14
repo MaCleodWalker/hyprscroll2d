@@ -57,6 +57,8 @@ function M.new_state()
         observed_active_id = nil,
         camera = { col = 0, row = 0 },
         overview = false,
+        overview_scroll = { x = 0, y = 0 },
+        overview_follow = false,
     }
 end
 
@@ -114,6 +116,7 @@ function M.sync(state, ids, active_id, config)
         local focused = state.positions[state.focused_id]
         state.camera.col = focused.col
         state.camera.row = focused.row
+        if state.overview then state.overview_follow = true end
     end
 end
 
@@ -169,7 +172,11 @@ function M.focus(state, direction)
     if not target then return nil end
 
     state.focused_id = target.id
-    if not state.overview then M.follow(state) end
+    if state.overview then
+        state.overview_follow = true
+    else
+        M.follow(state)
+    end
     return target.id
 end
 
@@ -206,7 +213,11 @@ end
 
 function M.set_overview(state, enabled)
     state.overview = not not enabled
-    if not state.overview then M.follow(state) end
+    if state.overview then
+        state.overview_follow = true
+    else
+        M.follow(state)
+    end
     return state.overview
 end
 
@@ -309,7 +320,10 @@ function M.placements(state, area, config)
     return placements
 end
 
-function M.overview_placements(state, area, config)
+-- Dense grid used by the overview: empty rows and columns are skipped, and a
+-- cell never shrinks below the configured fraction of the viewport. When the
+-- cells no longer fit, the content is larger than the viewport and scrolls.
+local function overview_metrics(state, area, config)
     local columns, rows = {}, {}
     local column_index, row_index = {}, {}
     for _, position in pairs(state.positions) do
@@ -323,7 +337,7 @@ function M.overview_placements(state, area, config)
         end
     end
 
-    if #columns == 0 then return {} end
+    if #columns == 0 then return nil end
 
     table.sort(columns)
     table.sort(rows)
@@ -340,27 +354,108 @@ function M.overview_placements(state, area, config)
     local max_gap_y = row_count > 1 and math.max(0, (usable_height - row_count) / (row_count - 1)) or 0
     local gap_x = column_count > 1 and math.max(0, math.min(config.gap_x or 0, max_gap_x)) or 0
     local gap_y = row_count > 1 and math.max(0, math.min(config.gap_y or 0, max_gap_y)) or 0
-    local cell_width = (usable_width - (gap_x * (column_count - 1))) / column_count
-    local cell_height = (usable_height - (gap_y * (row_count - 1))) / row_count
+    local fit_width = (usable_width - (gap_x * (column_count - 1))) / column_count
+    local fit_height = (usable_height - (gap_y * (row_count - 1))) / row_count
+    local min_width = area.w * clamp(config.overview_min_width or 0.25, 0, 1)
+    local min_height = area.h * clamp(config.overview_min_height or 0.25, 0, 1)
+    local cell_width = math.max(fit_width, min_width)
+    local cell_height = math.max(fit_height, min_height)
+
+    return {
+        column_index = column_index,
+        row_index = row_index,
+        padding_x = padding_x,
+        padding_y = padding_y,
+        gap_x = gap_x,
+        gap_y = gap_y,
+        cell_width = cell_width,
+        cell_height = cell_height,
+        content_width = (padding_x * 2) + (cell_width * column_count) + (gap_x * (column_count - 1)),
+        content_height = (padding_y * 2) + (cell_height * row_count) + (gap_y * (row_count - 1)),
+    }
+end
+
+-- Keep one cell axis inside the viewport, preferring the leading edge.
+local function reveal(scroll, start, size, padding, viewport)
+    if start - padding < scroll then
+        return start - padding
+    elseif start + size + padding > scroll + viewport then
+        return start + size + padding - viewport
+    end
+    return scroll
+end
+
+function M.overview_placements(state, area, config)
+    local metrics = overview_metrics(state, area, config)
+    if not metrics then return {} end
+
+    local scroll = state.overview_scroll
+    local focused = state.focused_id and state.positions[state.focused_id]
+    if state.overview_follow and focused then
+        local focused_col = metrics.column_index[focused.col] - 1
+        local focused_row = metrics.row_index[focused.row] - 1
+        scroll.x = reveal(scroll.x, metrics.padding_x + focused_col * (metrics.cell_width + metrics.gap_x),
+            metrics.cell_width, metrics.padding_x, area.w)
+        scroll.y = reveal(scroll.y, metrics.padding_y + focused_row * (metrics.cell_height + metrics.gap_y),
+            metrics.cell_height, metrics.padding_y, area.h)
+    end
+    state.overview_follow = false
+    scroll.x = clamp(scroll.x, 0, math.max(0, metrics.content_width - area.w))
+    scroll.y = clamp(scroll.y, 0, math.max(0, metrics.content_height - area.h))
+
     local placements = {}
 
     for id, position in pairs(state.positions) do
         local width_step = clamp(state.width_step_by_id[id] or config.default_width_step, 1, #config.width_steps)
         local height_step = clamp(state.height_step_by_id[id] or config.default_height_step, 1, #config.height_steps)
-        local width = cell_width * config.width_steps[width_step]
-        local height = cell_height * config.height_steps[height_step]
-        local cell_x = area.x + padding_x + ((column_index[position.col] - 1) * (cell_width + gap_x))
-        local cell_y = area.y + padding_y + ((row_index[position.row] - 1) * (cell_height + gap_y))
+        local width = metrics.cell_width * config.width_steps[width_step]
+        local height = metrics.cell_height * config.height_steps[height_step]
+        local cell_x = area.x + metrics.padding_x - scroll.x
+            + ((metrics.column_index[position.col] - 1) * (metrics.cell_width + metrics.gap_x))
+        local cell_y = area.y + metrics.padding_y - scroll.y
+            + ((metrics.row_index[position.row] - 1) * (metrics.cell_height + metrics.gap_y))
 
         placements[id] = {
-            x = cell_x + ((cell_width - width) / 2),
-            y = cell_y + ((cell_height - height) / 2),
+            x = cell_x + ((metrics.cell_width - width) / 2),
+            y = cell_y + ((metrics.cell_height - height) / 2),
             w = width,
             h = height,
         }
     end
 
     return placements
+end
+
+-- Scrolls the overview by half a cell. Wheel input is independent of the
+-- selection, so it does not ask the view to follow the focused window.
+function M.scroll_overview(state, direction, area, config)
+    local vector = DIRECTIONS[direction]
+    local metrics = vector and overview_metrics(state, area, config)
+    if not metrics then return false end
+
+    local scroll = state.overview_scroll
+    scroll.x = clamp(scroll.x + vector.dc * (metrics.cell_width + metrics.gap_x) / 2,
+        0, math.max(0, metrics.content_width - area.w))
+    scroll.y = clamp(scroll.y + vector.dr * (metrics.cell_height + metrics.gap_y) / 2,
+        0, math.max(0, metrics.content_height - area.h))
+    return true
+end
+
+-- Thumb start and size, as fractions of the track, for each scrollable axis.
+-- An axis that fits in the viewport reports a full-size thumb.
+function M.overview_scrollbars(state, area, config)
+    local metrics = overview_metrics(state, area, config)
+    local bars = { x = { start = 0, size = 1 }, y = { start = 0, size = 1 } }
+    if not metrics then return bars end
+
+    local scroll = state.overview_scroll
+    if metrics.content_width > area.w + 0.5 then
+        bars.x = { start = scroll.x / metrics.content_width, size = area.w / metrics.content_width }
+    end
+    if metrics.content_height > area.h + 0.5 then
+        bars.y = { start = scroll.y / metrics.content_height, size = area.h / metrics.content_height }
+    end
+    return bars
 end
 
 function M.position_of(state, id)

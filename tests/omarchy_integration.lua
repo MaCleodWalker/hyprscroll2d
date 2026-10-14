@@ -44,7 +44,15 @@ _G.o = {
     end,
 }
 
+local scroll_binds = {}
+
 _G.hl = {
+    bind = function(keys, action)
+        local bind = { keys = keys, action = action, enabled = true }
+        function bind:set_enabled(value) self.enabled = value end
+        scroll_binds[keys] = bind
+        return bind
+    end,
     layout = {
         register = function() end,
     },
@@ -169,6 +177,23 @@ active_workspace = { id = -98, tiled_layout = "scrolling", special = true }
 bindings["SUPER + L"]()
 assert(last_exec() == "omarchy-hyprland-workspace-layout-toggle", "special workspace should use Omarchy's toggle")
 assert(saved_workspaces() == "", "special workspace was saved")
+
+-- Scroll binds are consuming, so they stay off until an overview is open.
+for _, key in ipairs({ "mouse_down", "mouse_up", "mouse_left", "mouse_right" }) do
+    assert(scroll_binds[key] and not scroll_binds[key].enabled, key .. " scroll bind should start disabled")
+end
+overview_active = true
+_G.__hyprscroll2d_overview_changed()
+for _, key in ipairs({ "mouse_down", "mouse_up", "mouse_left", "mouse_right" }) do
+    assert(scroll_binds[key].enabled, key .. " scroll bind should enable with the overview")
+end
+scroll_binds.mouse_down.action()
+assert(dispatched[#dispatched].message == "scroll down", "wheel down did not scroll the overview")
+scroll_binds.mouse_left.action()
+assert(dispatched[#dispatched].message == "scroll left", "wheel left did not scroll the overview")
+overview_active = false
+_G.__hyprscroll2d_overview_changed()
+assert(not scroll_binds.mouse_down.enabled, "scroll bind should disable when the overview closes")
 
 -- The plugin restores saved workspaces and pins nothing by default.
 local workspace_file = assert(io.open(state_home .. "/hyprscroll2d/workspaces", "w"))

@@ -145,10 +145,16 @@ is active; the normal left/right workspace swipe remains unchanged.
 Hovering a neighboring edge peek focuses that window and centers the cursor
 inside it, so one mouse movement does not scroll through the whole row or column.
 
-In overview mode, every window is scaled into the viewport and labeled with its
-title. Use `Super+Arrow` to select a window or click one directly, then press
-`Super+Enter` to return to it. `Super+M` and `Super+Escape` also exit overview
-mode.
+In overview mode, windows are scaled down and labeled with their titles. Use
+`Super+Arrow` to select a window or click one directly, then press `Super+Enter`
+to return to it. `Super+M` and `Super+Escape` also exit overview mode.
+
+Windows never shrink below a quarter of the viewport in each direction. When a
+workspace has too many windows to fit, the overview scrolls instead: scroll bars
+appear along the edges, the mouse wheel or touchpad scrolls the map, and
+selecting a window with the arrow keys scrolls it into view. Scrolling is only
+captured while an overview is open.
+
 Overview resizes the actual windows, so their contents respond to the smaller
 window size according to each application's normal resize behavior. The Lua
 custom-layout API cannot uniformly scale a client's rendered pixels.
@@ -163,6 +169,8 @@ Edit [`layout/config.lua`](layout/config.lua) to change:
 - `gap_x` and `gap_y`: spacing between cells
 - `width_steps` and `height_steps`: available size presets
 - `default_width_step` and `default_height_step`: initial window dimensions
+- `overview_min_width` and `overview_min_height`: smallest overview window cell,
+  as a fraction of the viewport (default: `0.25`)
 
 Reload Hyprland after changing the values.
 

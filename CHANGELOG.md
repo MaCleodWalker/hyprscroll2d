@@ -7,6 +7,8 @@
 - Add Hyprscroll2D to the `Super+L` layout rotation (dwindle, scrolling,
   Hyprscroll2D) and remember the workspaces that use it.
 - Make `workspace` in `layout/config.lua` optional instead of defaulting to 9.
+- Keep overview windows at least a quarter of the viewport in size and scroll
+  larger workspaces with scroll bars, wheel scrolling and selection follow.
 
 ## v0.2.0 - 2026-08-24
 

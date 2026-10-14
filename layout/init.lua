@@ -20,17 +20,28 @@ local workspaces = {}
 local overview_status_path = os.getenv("XDG_RUNTIME_DIR")
     and (os.getenv("XDG_RUNTIME_DIR") .. "/hyprscroll2d-overview")
 
-local function write_overview_status(key, enabled)
+local last_overview_status = nil
+
+-- The shell reads "<workspace>|<overview>|<x start>,<x size>,<y start>,<y size>",
+-- where the last field positions the overview scroll bars.
+local function write_overview_status(key, enabled, bars)
     if not overview_status_path then
         return nil, "XDG_RUNTIME_DIR is not set"
     end
 
+    local status = key .. "|" .. (enabled and "true" or "false")
+    if enabled and bars then
+        status = status .. string.format("|%.4f,%.4f,%.4f,%.4f", bars.x.start, bars.x.size, bars.y.start, bars.y.size)
+    end
+    if status == last_overview_status then return true end
+
     local file, err = io.open(overview_status_path, "w")
     if not file then return nil, err end
-    local ok, write_err = file:write(key .. "|" .. (enabled and "true" or "false"))
+    local ok, write_err = file:write(status)
     local closed, close_err = file:close()
     if not ok then return nil, write_err end
     if not closed then return nil, close_err end
+    last_overview_status = status
     return true
 end
 
@@ -123,11 +134,20 @@ local function focus_descriptor(descriptor)
     hl.dispatch(hl.dsp.focus({ window = "address:" .. descriptor.address }))
 end
 
+local function overview_changed()
+    local callback = rawget(_G, "__hyprscroll2d_overview_changed")
+    if callback then pcall(callback) end
+end
+
 local function recalculate(ctx)
     local state, descriptors = context(ctx)
     local placements = state.overview
         and core.overview_placements(state, ctx.area, config)
         or core.placements(state, ctx.area, config)
+
+    if state.overview then
+        write_overview_status(workspace_key(ctx), true, core.overview_scrollbars(state, ctx.area, config))
+    end
 
     for id, descriptor in pairs(descriptors) do
         local placement = placements[id]
@@ -153,10 +173,14 @@ local function layout_msg(ctx, message)
         local ok, err = write_overview_status(workspace_key(ctx), enabled)
         if not ok then return "hyprscroll2d: unable to update overview status: " .. tostring(err) end
         core.set_overview(state, enabled)
+        overview_changed()
     elseif command == "overview-exit" then
         local ok, err = write_overview_status(workspace_key(ctx), false)
         if not ok then return "hyprscroll2d: unable to update overview status: " .. tostring(err) end
         core.set_overview(state, false)
+        overview_changed()
+    elseif command == "scroll" then
+        if state.overview then core.scroll_overview(state, argument, ctx.area, config) end
     elseif command == "resize" and argument == "width" then
         if extra ~= "grow" and extra ~= "shrink" then
             return "hyprscroll2d: resize width expects grow or shrink"
@@ -168,7 +192,7 @@ local function layout_msg(ctx, message)
         end
         core.resize_height(state, config, extra == "grow" and 1 or -1)
     else
-        return "hyprscroll2d: expected focus/move/pan <direction>, resize width/height grow/shrink, or center"
+        return "hyprscroll2d: expected focus/move/pan/scroll <direction>, resize width/height grow/shrink, or center"
     end
 
     return true

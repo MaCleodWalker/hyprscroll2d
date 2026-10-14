@@ -9,6 +9,11 @@ return {
     gap_x = 12,
     gap_y = 12,
 
+    -- Smallest a window cell may shrink to in the overview, as a fraction of
+    -- the viewport. Larger workspaces scroll instead of shrinking further.
+    overview_min_width = 0.25,
+    overview_min_height = 0.25,
+
     -- Window dimensions are fractions of one grid cell. The largest preset
     -- still preserves the configured edge peeks.
     width_steps = { 0.50, 0.67, 0.85, 1.00 },

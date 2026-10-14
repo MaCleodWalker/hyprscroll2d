@@ -128,6 +128,34 @@ hl.gesture({
     action = route("focus down"),
 })
 
+-- Wheel and touchpad scrolling pan a scrollable overview. Scroll binds consume
+-- the event, so they are only enabled while the focused workspace shows its
+-- overview and applications scroll normally the rest of the time.
+local scroll_binds = {}
+local scroll_binds_enabled = nil
+for key, message in pairs({
+    mouse_down = "scroll down",
+    mouse_up = "scroll up",
+    mouse_right = "scroll right",
+    mouse_left = "scroll left",
+}) do
+    local bind = hl.bind(key, function() hl.dispatch(hl.dsp.layout(message)) end)
+    bind:set_enabled(false)
+    table.insert(scroll_binds, bind)
+end
+
+local function sync_scroll_binds()
+    local overview_active = rawget(_G, "__hyprscroll2d_is_overview_active")
+    local enabled = overview_active ~= nil and overview_active() == true
+    if enabled == scroll_binds_enabled then return end
+    scroll_binds_enabled = enabled
+    for _, bind in ipairs(scroll_binds) do bind:set_enabled(enabled) end
+end
+
+_G.__hyprscroll2d_overview_changed = sync_scroll_binds
+hl.on("workspace.active", sync_scroll_binds)
+hl.on("window.active", sync_scroll_binds)
+
 replace("SUPER + code:20", "Grow window width", "resize width grow", function()
     return hl.dsp.window.resize({ x = -100, y = 0, relative = true })
 end)

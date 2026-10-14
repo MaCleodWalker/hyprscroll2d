@@ -131,6 +131,32 @@ assert(overview_status == "workspace:9|false", "overview exit status was not pub
 registered.provider.recalculate(ctx)
 assert(b.placed.x > a.placed.x, "overview exit should restore the normal layout")
 
+-- A workspace too large for the minimum cell size scrolls and reports scroll bars.
+local overview_changes = 0
+_G.__hyprscroll2d_overview_changed = function() overview_changes = overview_changes + 1 end
+local crowded_targets = {}
+for i = 1, 8 do crowded_targets[i] = target("crowd" .. i, i == 1, 30) end
+local crowded = { area = { x = 0, y = 0, w = 1000, h = 800 }, targets = crowded_targets }
+registered.provider.recalculate(crowded)
+assert(registered.provider.layout_msg(crowded, "scroll right") == true, "scroll command was rejected")
+
+response = registered.provider.layout_msg(crowded, "overview")
+assert(response == true, "overview command was rejected for the crowded workspace")
+assert(overview_changes == 1, "overview change was not announced")
+registered.provider.recalculate(crowded)
+local x_start, x_size = overview_status:match("^workspace:30|true|([%d.]+),([%d.]+),")
+assert(x_start and tonumber(x_size) < 1, "scroll bars were not published: " .. tostring(overview_status))
+
+local before_scroll = crowded_targets[1].placed.x
+assert(registered.provider.layout_msg(crowded, "scroll right") == true, "scroll command was rejected")
+registered.provider.recalculate(crowded)
+assert(crowded_targets[1].placed.x < before_scroll, "scrolling right should move the windows left")
+
+response = registered.provider.layout_msg(crowded, "overview-exit")
+assert(response == true and overview_changes == 2, "overview exit was not announced")
+assert(overview_status == "workspace:30|false", "overview exit should clear the scroll bars")
+_G.__hyprscroll2d_overview_changed = nil
+
 local function activate(context, selected)
     for _, item in ipairs(context.targets) do
         item.window.active = item == selected

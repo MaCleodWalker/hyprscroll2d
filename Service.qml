@@ -129,6 +129,11 @@ Item {
                     targetScreen.height
                 )
                 property var status: root.overviewState.split("|")
+                // Thumb start and size as fractions of each track: x start, x size, y start, y size.
+                readonly property var bars: {
+                    var values = status.length > 2 ? status[2].split(",").map(Number) : []
+                    return values.length === 4 && values.every(isFinite) ? values : [0, 1, 0, 1]
+                }
                 readonly property bool workspaceMatches: !!(
                     monitor
                     && monitor.activeWorkspace
@@ -149,6 +154,44 @@ Item {
                 visible: status[1] === "true" && workspaceMatches
                 WlrLayershell.layer: WlrLayer.Overlay
                 WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+                Rectangle {
+                    id: verticalTrack
+                    visible: screenOverlay.bars[3] < 1
+                    x: screenOverlay.screenGeometry.width - width - 4
+                    y: 8
+                    width: 6
+                    height: screenOverlay.screenGeometry.height - 16
+                    radius: 3
+                    color: "#55171923"
+
+                    Rectangle {
+                        width: parent.width
+                        y: screenOverlay.bars[2] * parent.height
+                        height: Math.max(24, screenOverlay.bars[3] * parent.height)
+                        radius: 3
+                        color: "#ccf4f4f5"
+                    }
+                }
+
+                Rectangle {
+                    id: horizontalTrack
+                    visible: screenOverlay.bars[1] < 1
+                    x: 8
+                    y: screenOverlay.screenGeometry.height - height - 4
+                    width: screenOverlay.screenGeometry.width - 16
+                    height: 6
+                    radius: 3
+                    color: "#55171923"
+
+                    Rectangle {
+                        height: parent.height
+                        x: screenOverlay.bars[0] * parent.width
+                        width: Math.max(24, screenOverlay.bars[1] * parent.width)
+                        radius: 3
+                        color: "#ccf4f4f5"
+                    }
+                }
 
                 Repeater {
                     model: root.clientsForScreen(screenOverlay.targetScreen, root.refreshTick)
