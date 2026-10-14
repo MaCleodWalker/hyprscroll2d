@@ -86,7 +86,9 @@ configuration files.
 - It registers the `omalattice` layout and replaces some Omarchy keybindings
   with versions that fall back to the original action outside the layout. It
   rebinds `Super+L` to add Omalattice to the layout rotation, and adds
-  three-finger up/down swipes. Scroll binds are active only while an overview
+  three-finger focus swipes. While an Omalattice workspace is active it also
+  switches Hyprland's `follow_mouse` to click-to-focus and focuses hovered
+  windows itself after a short delay. Scroll binds are active only while an overview
   is open.
 - It stores the workspaces you rotated into the layout in
   `~/.local/state/omalattice/workspaces` and the overview state in
@@ -162,20 +164,39 @@ If `hyprctl configerrors` prints nothing, the manual setup is ready.
 | Select the focused overview window | `Super+Enter` |
 | Exit overview | `Super+Escape` |
 | Focus a window above/below | Three-finger swipe up/down |
+| Focus a window left/right | Three-finger swipe left/right |
 
 The focus, move and resize bindings retain Omarchy's normal behavior whenever
 the active window is not using Omalattice. `Super+Enter` selects the overview
 window while overview is active and otherwise keeps Omarchy's terminal action.
-Three-finger vertical swipes focus the window above or below while Omalattice
-is active; the normal left/right workspace swipe remains unchanged.
+Three-finger swipes focus the neighboring window while Omalattice is active.
+Vertical swipes always do this. All swipes follow your touchpad's
+`natural_scroll` setting: with it on, swiping up focuses the window below and
+swiping left focuses the window to the right (the content follows your
+fingers); with it off, each swipe focuses the window in the same direction. A horizontal swipe is normally taken by
+Hyprland's workspace swipe, so on an Omalattice workspace Omalattice unsets
+`hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })`
+and uses left/right focus swipes instead; it restores the workspace swipe on
+other workspaces. Hyprland cannot report which gestures exist, so this assumes
+you have that exact workspace swipe: set `workspace_swipe = false` in
+[`layout/config.lua`](layout/config.lua) if you do not, and the left/right
+focus swipes stay always on. Set `gesture_fingers` if your workspace swipe uses
+a different finger count. A workspace swipe with extra options such as `scale`
+or `mods` cannot be unset and keeps priority over the left/right swipes.
 
 Hovering a neighboring edge peek focuses that window and centers the cursor
 inside it, so one mouse movement does not scroll through the whole row or column.
+Focus follows the mouse only after the pointer has rested on a window for
+`hover_focus_delay` milliseconds (150 by default), so moving across the edge
+peeks no longer scrolls the grid. Set it to `0` to use Hyprland's immediate
+`follow_mouse` behavior. The delay applies only while `input.follow_mouse` is
+`1`, and is paused while a launcher holds the keyboard, a window is fullscreen or the
+overview is open.
 
 In overview mode, every window is shown as a live, scaled-down thumbnail with
-its title across the top. Use `Super+Arrow` to select a window or click one
-directly, then press `Super+Enter` to return to it. `Super+M` and
-`Super+Escape` also exit overview mode.
+its title across the top. Use `Super+Arrow` to select a window and
+`Super+Enter` to return to it, or click a window directly to enter it.
+`Super+M` and `Super+Escape` also exit overview mode.
 
 Thumbnails are drawn by the Omarchy shell service, so the real windows keep
 their size and applications do not re-lay out while the overview is open.
@@ -184,6 +205,11 @@ When a workspace has too many windows to fit, the overview scrolls instead:
 scroll bars appear along the edges, the mouse wheel or touchpad scrolls the map,
 and selecting a window with the arrow keys scrolls it into view. Scrolling is
 only captured while an overview is open.
+
+Move the mouse to the edge of the viewport to pan a scrollable overview
+automatically; it speeds up toward the edge and stops at the end of the
+content (`overview_autoscroll_speed`, `0` to disable). Clicking a thumbnail
+enters that window, closes the overview and moves the pointer into the window.
 
 Without the shell service, set `overview_thumbnails = false` in
 [`layout/config.lua`](layout/config.lua). The overview then resizes the real
@@ -201,7 +227,14 @@ Edit [`layout/config.lua`](layout/config.lua) to change:
 - `gap_x` and `gap_y`: spacing between cells
 - `width_steps` and `height_steps`: available size presets
 - `default_width_step` and `default_height_step`: initial window dimensions
+- `hover_focus_delay`: milliseconds the mouse must rest on a window before it
+  takes focus (default: `150`; `0` disables the delay)
+- `gesture_fingers`: finger count for the focus swipes (default: `3`)
+- `workspace_swipe`: whether you have a horizontal workspace swipe for the
+  left/right focus swipes to replace on Omalattice workspaces (default: `true`)
 - `overview_thumbnails`: draw live thumbnails in the overview (default: `true`)
+- `overview_autoscroll_speed`: pixels per second the overview pans at the edge
+  of the viewport (default: `900`; `0` disables)
 - `overview_min_width` and `overview_min_height`: smallest overview window cell,
   as a fraction of the viewport (default: `0.25`)
 

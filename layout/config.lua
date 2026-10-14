@@ -9,9 +9,30 @@ return {
     gap_x = 12,
     gap_y = 12,
 
+    -- Milliseconds the mouse must rest on another window before it takes focus
+    -- on an Omalattice workspace. This stops the edge peeks from scrolling the
+    -- grid while the pointer only passes over them. Set to 0 to keep Hyprland's
+    -- immediate follow_mouse behaviour.
+    hover_focus_delay = 150,
+
+    -- Number of fingers for the touchpad focus swipes: up/down always move
+    -- focus, and left/right do too while an Omalattice workspace is active.
+    gesture_fingers = 3,
+
+    -- Set to true if you configured a horizontal workspace swipe with
+    -- `gesture_fingers` fingers (the Omarchy example enables one). It then
+    -- gives way to the left/right focus swipes on Omalattice workspaces. Set to
+    -- false if you have none, and the focus swipes are always active.
+    workspace_swipe = true,
+
     -- Draw live scaled thumbnails of each window in the overview (needs the
     -- Omarchy shell service). Set to false to resize the real windows instead.
     overview_thumbnails = true,
+
+    -- Speed in pixels per second at which a scrollable overview pans when the
+    -- mouse is at the edge of the viewport; it slows toward the middle. Set to
+    -- 0 to scroll only with the wheel and keys.
+    overview_autoscroll_speed = 900,
 
     -- Smallest a window cell may shrink to in the overview, as a fraction of
     -- the viewport. Larger workspaces scroll instead of shrinking further.

@@ -4,6 +4,7 @@ test:
 	lua tests/run.lua
 	lua tests/hyprland_adapter.lua
 	lua tests/omarchy_integration.lua
+	lua tests/hover.lua
 	bash tests/installer.sh
 
 check: test

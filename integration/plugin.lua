@@ -20,6 +20,10 @@ local workspaces = dofile(root_dir .. "/integration/workspaces.lua")
 local function apply_workspaces()
     if pinned ~= nil then workspaces.apply(pinned) end
     workspaces.restore()
+    -- Restored workspaces switch layout after this returns and no event
+    -- announces it, so layout-dependent state is refreshed afterwards.
+    local resync = rawget(_G, "__omalattice_resync_later")
+    if resync then resync() end
 end
 
 if rawget(_G, "__omalattice_plugin_loaded") then

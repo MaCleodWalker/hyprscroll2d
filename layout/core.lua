@@ -491,6 +491,20 @@ function M.overview_placements(state, area, config)
     return placements
 end
 
+-- Scrolls the overview by a pixel distance, stopping at the content edges.
+-- Returns whether the view actually moved.
+function M.scroll_overview_by(state, dx, dy, area, config)
+    local metrics = overview_metrics(state, area, config)
+    if not metrics then return false end
+
+    local scroll = state.overview_scroll
+    local x = clamp(scroll.x + dx, 0, math.max(0, metrics.content_width - area.w))
+    local y = clamp(scroll.y + dy, 0, math.max(0, metrics.content_height - area.h))
+    local moved = x ~= scroll.x or y ~= scroll.y
+    scroll.x, scroll.y = x, y
+    return moved
+end
+
 -- Scrolls the overview by half a cell. Wheel input is independent of the
 -- selection, so it does not ask the view to follow the focused window.
 function M.scroll_overview(state, direction, area, config)
@@ -498,12 +512,30 @@ function M.scroll_overview(state, direction, area, config)
     local metrics = vector and overview_metrics(state, area, config)
     if not metrics then return false end
 
-    local scroll = state.overview_scroll
-    scroll.x = clamp(scroll.x + vector.dc * (metrics.cell_width + metrics.gap_x) / 2,
-        0, math.max(0, metrics.content_width - area.w))
-    scroll.y = clamp(scroll.y + vector.dr * (metrics.cell_height + metrics.gap_y) / 2,
-        0, math.max(0, metrics.content_height - area.h))
+    M.scroll_overview_by(state,
+        vector.dc * (metrics.cell_width + metrics.gap_x) / 2,
+        vector.dr * (metrics.cell_height + metrics.gap_y) / 2, area, config)
     return true
+end
+
+-- Auto-scroll speed in pixels per second for a pointer at `point`: zero in the
+-- middle of the viewport, rising to the configured speed at its edges.
+function M.edge_scroll_velocity(point, area, config)
+    local speed = config.overview_autoscroll_speed
+    if type(speed) ~= "number" or speed <= 0 then return 0, 0 end
+    if point.x < area.x or point.x > area.x + area.w or point.y < area.y or point.y > area.y + area.h then
+        return 0, 0
+    end
+
+    local edge = math.min(area.w, area.h) * 0.12
+    local function axis(position, start, length)
+        local from_start = position - start
+        local from_end = start + length - position
+        if from_start < edge then return -speed * (1 - from_start / edge) end
+        if from_end < edge then return speed * (1 - from_end / edge) end
+        return 0
+    end
+    return axis(point.x, area.x, area.w), axis(point.y, area.y, area.h)
 end
 
 -- Thumb start and size, as fractions of the track, for each scrollable axis.

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Pan a scrollable overview automatically when the mouse is near the edge of
+  the viewport (`overview_autoscroll_speed`).
+- Make clicking an overview thumbnail enter that window and close the overview.
+- Fix three-finger left/right swipes switching workspaces on an Omalattice
+  workspace: they now move focus, and the workspace swipe returns elsewhere.
+- Add `hover_focus_delay` to debounce focus-follows-mouse on Omalattice
+  workspaces, so crossing the edge peeks no longer scrolls the grid.
+- Make the focus swipes follow the touchpad `natural_scroll` setting.
+- Add `gesture_fingers` to set the finger count for the focus swipes.
+
 ## v0.3.0 - 2026-10-14
 
 Omalattice is a fork of Hyprscroll2D by kirollosatef. Entries below this

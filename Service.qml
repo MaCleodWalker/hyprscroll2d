@@ -67,10 +67,12 @@ Item {
         return null
     }
 
-    function selectWindow(address) {
+    // Clicking a thumbnail enters that window and closes the overview.
+    function enterWindow(address) {
         Quickshell.execDetached([
             "hyprctl", "eval",
             "hl.dispatch(hl.dsp.focus({ window = \"address:0x" + root.normalizeAddress(address) + "\" }))"
+                + " hl.dispatch(hl.dsp.layout(\"overview-exit click\"))"
         ])
     }
 
@@ -299,7 +301,7 @@ Item {
 
                                 MouseArea {
                                     anchors.fill: parent
-                                    onClicked: root.selectWindow(cell.modelData.address)
+                                    onClicked: root.enterWindow(cell.modelData.address)
                                 }
                             }
                         }
