@@ -13,6 +13,8 @@ Item {
     property var overview: closedOverview
     readonly property string overviewStatusPath: Quickshell.env("XDG_RUNTIME_DIR")
         + "/hyprscroll2d-overview"
+    readonly property string wallpaperUrl: "file://" + Quickshell.env("HOME")
+        + "/.local/state/omarchy/current/background"
     readonly property string bootstrapPath: decodeURIComponent(
         Qt.resolvedUrl("integration/plugin.lua").toString().replace(/^file:\/\//, "")
     )
@@ -201,10 +203,25 @@ Item {
                     height: screenOverlay.area.height
                     clip: true
 
+                    // The windows are stacked underneath for capture, so redraw the wallpaper
+                    // over them the way Omarchy's background does.
                     Rectangle {
                         anchors.fill: parent
-                        visible: screenOverlay.tiles.length > 0
+                        visible: screenOverlay.tiles.length > 0 && wallpaper.status !== Image.Ready
                         color: "#101216"
+                    }
+
+                    Image {
+                        id: wallpaper
+                        visible: screenOverlay.tiles.length > 0
+                        x: -viewport.x
+                        y: -viewport.y
+                        width: screenOverlay.screenGeometry.width
+                        height: screenOverlay.screenGeometry.height
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: false
+                        source: screenOverlay.tiles.length > 0 ? root.wallpaperUrl : ""
                     }
 
                     Repeater {
