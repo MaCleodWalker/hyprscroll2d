@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for helping build Hyprscroll2D.
+Thank you for helping build Omalattice.
 
 Before proposing a change:
 

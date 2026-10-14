@@ -118,6 +118,8 @@ test("overview caps gaps when the viewport is too small for all cells", function
         default_height_step = 1,
         gap_x = 1000,
         gap_y = 1000,
+        overview_min_width = 0,
+        overview_min_height = 0,
     }
     local area = { x = 0, y = 0, w = 50, h = 40 }
     local placements = core.overview_placements(state, area, overview_config)
@@ -127,6 +129,98 @@ test("overview caps gaps when the viewport is too small for all cells", function
         assert(placement.x + placement.w <= area.x + area.w)
         assert(placement.y + placement.h <= area.y + area.h)
     end
+end)
+
+local function spread(count)
+    local ids = {}
+    for index = 1, count do ids[index] = "W" .. index end
+    local state = fresh(ids, "W1")
+    for index, id in ipairs(ids) do state.positions[id] = { col = index - 1, row = 0 } end
+    return state, ids
+end
+
+test("overview never shrinks a cell below the minimum and scrolls instead", function()
+    local state = spread(8)
+    local area = { x = 0, y = 0, w = 1000, h = 800 }
+    core.set_overview(state, true)
+    local placements = core.overview_placements(state, area, config)
+
+    for _, placement in pairs(placements) do
+        assert(placement.w >= 250 * config.width_steps[config.default_width_step] - 0.01,
+            "overview window shrank below the minimum width")
+    end
+
+    local bars = core.overview_scrollbars(state, area, config)
+    assert(bars.x.size < 1, "horizontal scroll bar should appear")
+    equal(bars.y.size, 1, "vertical axis fits")
+end)
+
+test("overview thumbnails keep the window proportions and center small workspaces", function()
+    local state = spread(2)
+    local area = { x = 100, y = 50, w = 1000, h = 800 }
+    core.set_overview(state, true)
+    local placements = core.overview_placements(state, area, config)
+
+    local width_step, height_step = core.size_steps_of(state, "W1")
+    local expected = (config.height_steps[height_step] * area.h) / (config.width_steps[width_step] * area.w)
+    for _, placement in pairs(placements) do
+        assert(math.abs(placement.h / placement.w - expected) < 1e-6, "tile proportions drifted")
+    end
+
+    local left, right = placements.W1, placements.W2
+    local gap_left = left.x - area.x
+    local gap_right = (area.x + area.w) - (right.x + right.w)
+    assert(math.abs(gap_left - gap_right) < 1e-6, "tiles should be centered horizontally")
+    local top = math.min(left.y, right.y) - area.y
+    local bottom = (area.y + area.h) - math.max(left.y + left.h, right.y + right.h)
+    assert(math.abs(top - bottom) < 1e-6, "tiles should be centered vertically")
+end)
+
+test("overview scrolls by wheel and clamps at the content edges", function()
+    local state = spread(8)
+    local area = { x = 0, y = 0, w = 1000, h = 800 }
+    core.set_overview(state, true)
+    core.overview_placements(state, area, config)
+
+    local before = core.overview_placements(state, area, config).W1.x
+    assert(core.scroll_overview(state, "right", area, config))
+    local after = core.overview_placements(state, area, config).W1.x
+    assert(after < before, "scrolling right should move the content left")
+
+    for _ = 1, 100 do core.scroll_overview(state, "right", area, config) end
+    local bars = core.overview_scrollbars(state, area, config)
+    assert(math.abs((bars.x.start + bars.x.size) - 1) < 1e-6, "scroll should clamp at the end")
+
+    for _ = 1, 100 do core.scroll_overview(state, "left", area, config) end
+    equal(core.overview_scrollbars(state, area, config).x.start, 0, "scroll should clamp at the start")
+    assert(not core.scroll_overview(state, "sideways", area, config), "unknown direction was accepted")
+end)
+
+test("overview scrolls the selected window into view", function()
+    local state = spread(8)
+    local area = { x = 0, y = 0, w = 1000, h = 800 }
+    core.set_overview(state, true)
+    core.overview_placements(state, area, config)
+
+    for _ = 1, 7 do core.focus(state, "right") end
+    equal(state.focused_id, "W8")
+    local placement = core.overview_placements(state, area, config).W8
+    assert(placement.x >= area.x and placement.x + placement.w <= area.x + area.w,
+        "selected window should be fully visible")
+
+    for _ = 1, 7 do core.focus(state, "left") end
+    placement = core.overview_placements(state, area, config).W1
+    assert(placement.x >= area.x, "first window should scroll back into view")
+end)
+
+test("overview does not scroll when every cell fits", function()
+    local state = spread(3)
+    local area = { x = 0, y = 0, w = 1000, h = 800 }
+    core.set_overview(state, true)
+    core.overview_placements(state, area, config)
+    local bars = core.overview_scrollbars(state, area, config)
+    equal(bars.x.size, 1)
+    equal(bars.y.size, 1)
 end)
 
 test("width and height presets are independent", function()
@@ -191,12 +285,43 @@ test("manual camera pan survives ordinary synchronization", function()
     equal(state.camera.row, 1)
 end)
 
-test("closed windows are removed without disturbing survivors", function()
+test("closing a window closes the gap it leaves", function()
     local state = fresh({ "A", "B", "C" }, "B")
-    local original = core.position_of(state, "C").col
     core.sync(state, { "A", "C" }, "C", config)
     assert(not core.has_id(state, "B"))
-    equal(core.position_of(state, "C").col, original)
+    equal(core.position_of(state, "A").col, 0)
+    equal(core.position_of(state, "C").col, 1, "survivor should close up against its neighbor")
+
+    local placements = core.placements(state, { x = 0, y = 0, w = 1000, h = 800 }, config)
+    equal(placements.C.x - (placements.A.x + placements.A.w), config.gap_x, "blank space between windows")
 end)
 
-print(string.format("hyprscroll2d: %d tests passed", passed))
+test("moving a window out of a column closes the empty column", function()
+    local state = fresh({ "A", "B", "C" }, "B")
+    assert(core.move(state, "down"))
+    assert(core.move(state, "left"))
+    equal(core.position_of(state, "B").col, 0)
+    equal(core.position_of(state, "B").row, 1)
+    equal(core.position_of(state, "C").col, 1, "column left empty by the move should close")
+    equal(state.camera.col, 0, "camera follows the moved window")
+    equal(state.camera.row, 1)
+end)
+
+test("closing the focused window keeps the camera on its neighbor", function()
+    local state = fresh({ "A", "B", "C" }, "B")
+    core.sync(state, { "A", "C" }, "C", config)
+    equal(state.focused_id, "C")
+    equal(state.camera.col, core.position_of(state, "C").col)
+end)
+
+test("a pan past the edge keeps its distance when the grid closes up", function()
+    local state = fresh({ "A", "B", "C" }, "B")
+    core.pan(state, "left")
+    core.pan(state, "left")
+    equal(state.camera.col, -1)
+    core.sync(state, { "B", "C" }, "B", config)
+    equal(core.position_of(state, "B").col, 0)
+    assert(state.camera.col < 0, "camera should stay left of the grid")
+end)
+
+print(string.format("omalattice: %d tests passed", passed))

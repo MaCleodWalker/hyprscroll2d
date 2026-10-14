@@ -1,9 +1,9 @@
-if rawget(_G, "__hyprscroll2d_layout_registered") then return true end
+if rawget(_G, "__omalattice_layout_registered") then return true end
 
 local function current_dir()
     local source = debug and debug.getinfo(1, "S").source
     if type(source) ~= "string" or source:sub(1, 1) ~= "@" then
-        error("hyprscroll2d: unable to resolve layout directory")
+        error("omalattice: unable to resolve layout directory")
     end
     return source:sub(2):match("^(.*)/[^/]*$")
 end
@@ -17,6 +17,63 @@ end
 local config = load_relative("config.lua")
 local core = load_relative("core.lua")
 local workspaces = {}
+local overview_status_path = os.getenv("XDG_RUNTIME_DIR")
+    and (os.getenv("XDG_RUNTIME_DIR") .. "/omalattice-overview")
+
+local last_overview_status = nil
+
+local function json_string(value)
+    return '"' .. tostring(value):gsub('[%c"\\]', function(char)
+        return string.format("\\u%04x", char:byte())
+    end) .. '"'
+end
+
+-- The shell reads this JSON to draw the overview. "payload" carries the
+-- scroll bars and the window tiles while an overview is open.
+local function write_overview_status(key, enabled, payload)
+    if not overview_status_path then
+        return nil, "XDG_RUNTIME_DIR is not set"
+    end
+
+    local status = string.format('{"workspace":%s,"overview":%s%s}',
+        json_string(key), enabled and "true" or "false", enabled and payload or "")
+    if status == last_overview_status then return true end
+
+    local file, err = io.open(overview_status_path, "w")
+    if not file then return nil, err end
+    local ok, write_err = file:write(status)
+    local closed, close_err = file:close()
+    if not ok then return nil, write_err end
+    if not closed then return nil, close_err end
+    last_overview_status = status
+    return true
+end
+
+local function overview_payload(ctx, state, descriptors, tiles)
+    local bars = core.overview_scrollbars(state, ctx.area, config)
+    local entries = {}
+    for _, id in ipairs(state.ids) do
+        local descriptor, tile = descriptors[id], tiles[id]
+        if descriptor and descriptor.address and tile then
+            table.insert(entries, string.format('{"address":%s,"x":%.2f,"y":%.2f,"w":%.2f,"h":%.2f}',
+                json_string(descriptor.address), tile.x, tile.y, tile.w, tile.h))
+        end
+    end
+
+    return string.format(
+        ',"thumbnails":%s,"area":{"x":%.2f,"y":%.2f,"w":%.2f,"h":%.2f},"bars":[%.4f,%.4f,%.4f,%.4f],"tiles":[%s]',
+        config.overview_thumbnails ~= false and "true" or "false",
+        ctx.area.x, ctx.area.y, ctx.area.w, ctx.area.h,
+        bars.x.start, bars.x.size, bars.y.start, bars.y.size,
+        table.concat(entries, ","))
+end
+
+if overview_status_path then
+    local ok, err = write_overview_status("none", false)
+    if not ok then
+        io.stderr:write("omalattice: unable to reset overview status: " .. tostring(err) .. "\n")
+    end
+end
 
 local function safe_field(value, field)
     if value == nil then return nil end
@@ -45,7 +102,7 @@ local function workspace_key(ctx)
     return "global"
 end
 
-_G.__hyprscroll2d_is_overview_active = function()
+_G.__omalattice_is_overview_active = function()
     local ok, window = pcall(hl.get_active_window)
     if not ok or not window then return false end
 
@@ -100,11 +157,35 @@ local function focus_descriptor(descriptor)
     hl.dispatch(hl.dsp.focus({ window = "address:" .. descriptor.address }))
 end
 
+local function overview_changed()
+    local callback = rawget(_G, "__omalattice_overview_changed")
+    if callback then pcall(callback) end
+end
+
 local function recalculate(ctx)
     local state, descriptors = context(ctx)
-    local placements = state.overview
-        and core.overview_placements(state, ctx.area, config)
-        or core.placements(state, ctx.area, config)
+    local placements
+    if state.overview then
+        local tiles = core.overview_placements(state, ctx.area, config)
+        write_overview_status(workspace_key(ctx), true, overview_payload(ctx, state, descriptors, tiles))
+        if config.overview_thumbnails ~= false then
+            -- The shell draws the thumbnails, so the windows keep their size. They are
+            -- stacked on screen because the compositor only captures visible windows.
+            placements = {}
+            for id, box in pairs(core.placements(state, ctx.area, config)) do
+                placements[id] = {
+                    x = ctx.area.x + (ctx.area.w - box.w) / 2,
+                    y = ctx.area.y + (ctx.area.h - box.h) / 2,
+                    w = box.w,
+                    h = box.h,
+                }
+            end
+        else
+            placements = tiles
+        end
+    else
+        placements = core.placements(state, ctx.area, config)
+    end
 
     for id, descriptor in pairs(descriptors) do
         local placement = placements[id]
@@ -126,21 +207,30 @@ local function layout_msg(ctx, message)
     elseif command == "follow" or command == "center" then
         core.follow(state)
     elseif command == "overview" then
-        core.set_overview(state, not state.overview)
+        local enabled = not state.overview
+        local ok, err = write_overview_status(workspace_key(ctx), enabled)
+        if not ok then return "omalattice: unable to update overview status: " .. tostring(err) end
+        core.set_overview(state, enabled)
+        overview_changed()
     elseif command == "overview-exit" then
+        local ok, err = write_overview_status(workspace_key(ctx), false)
+        if not ok then return "omalattice: unable to update overview status: " .. tostring(err) end
         core.set_overview(state, false)
+        overview_changed()
+    elseif command == "scroll" then
+        if state.overview then core.scroll_overview(state, argument, ctx.area, config) end
     elseif command == "resize" and argument == "width" then
         if extra ~= "grow" and extra ~= "shrink" then
-            return "hyprscroll2d: resize width expects grow or shrink"
+            return "omalattice: resize width expects grow or shrink"
         end
         core.resize_width(state, config, extra == "grow" and 1 or -1)
     elseif command == "resize" and argument == "height" then
         if extra ~= "grow" and extra ~= "shrink" then
-            return "hyprscroll2d: resize height expects grow or shrink"
+            return "omalattice: resize height expects grow or shrink"
         end
         core.resize_height(state, config, extra == "grow" and 1 or -1)
     else
-        return "hyprscroll2d: expected focus/move/pan <direction>, resize width/height grow/shrink, or center"
+        return "omalattice: expected focus/move/pan/scroll <direction>, resize width/height grow/shrink, or center"
     end
 
     return true
@@ -151,10 +241,10 @@ local function window_layout_name(window)
     return safe_field(layout, "name")
 end
 
-if not rawget(_G, "__hyprscroll2d_focus_subscription") then
+if not rawget(_G, "__omalattice_focus_subscription") then
     local ok, subscription = pcall(function()
         return hl.on("window.active", function(window)
-            if window_layout_name(window) == "lua:hyprscroll2d" then
+            if window_layout_name(window) == "lua:omalattice" then
                 local workspace = safe_field(window, "workspace")
                 local id = safe_field(workspace, "id")
                 local name = safe_field(workspace, "name")
@@ -177,13 +267,13 @@ if not rawget(_G, "__hyprscroll2d_focus_subscription") then
             end
         end)
     end)
-    if ok then _G.__hyprscroll2d_focus_subscription = subscription or true end
+    if ok then _G.__omalattice_focus_subscription = subscription or true end
 end
 
-hl.layout.register("hyprscroll2d", {
+hl.layout.register("omalattice", {
     recalculate = recalculate,
     layout_msg = layout_msg,
 })
 
-_G.__hyprscroll2d_layout_registered = true
+_G.__omalattice_layout_registered = true
 return true

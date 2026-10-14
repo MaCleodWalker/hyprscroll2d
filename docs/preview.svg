@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c140d"/><stop offset="1" stop-color="#120d08"/></linearGradient></defs>
+<rect width="1600" height="900" fill="url(#bg)"/>
+<line x1="0" y1="0" x2="0" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="80" y1="0" x2="80" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="160" y1="0" x2="160" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="240" y1="0" x2="240" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="320" y1="0" x2="320" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="400" y1="0" x2="400" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="480" y1="0" x2="480" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="560" y1="0" x2="560" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="640" y1="0" x2="640" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="720" y1="0" x2="720" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="800" y1="0" x2="800" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="880" y1="0" x2="880" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="960" y1="0" x2="960" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="1040" y1="0" x2="1040" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="1120" y1="0" x2="1120" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="1200" y1="0" x2="1200" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="1280" y1="0" x2="1280" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="1360" y1="0" x2="1360" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="1440" y1="0" x2="1440" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="1520" y1="0" x2="1520" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="1600" y1="0" x2="1600" y2="900" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="0" x2="1600" y2="0" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="80" x2="1600" y2="80" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="160" x2="1600" y2="160" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="240" x2="1600" y2="240" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="320" x2="1600" y2="320" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="400" x2="1600" y2="400" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="480" x2="1600" y2="480" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="560" x2="1600" y2="560" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="640" x2="1600" y2="640" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="720" x2="1600" y2="720" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="800" x2="1600" y2="800" stroke="#ffffff" stroke-opacity="0.035"/>
+<line x1="0" y1="880" x2="1600" y2="880" stroke="#ffffff" stroke-opacity="0.035"/>
+<text x="800" y="250" text-anchor="middle" font-family="JetBrainsMono Nerd Font, monospace" font-weight="700" font-size="132" fill="#f4efe6" letter-spacing="2">Omalattice</text>
+<text x="800" y="318" text-anchor="middle" font-family="JetBrainsMono Nerd Font, monospace" font-size="34" fill="#e8a838">a 2D scrolling layout for Omarchy</text>
+<text x="800" y="364" text-anchor="middle" font-family="JetBrainsMono Nerd Font, monospace" font-size="24" fill="#9a8f80">live overview · wheel scrolling · Super+L rotation</text>
+<g>
+<rect x="118" y="420" width="320" height="178" rx="8" fill="#1b1e28"/>
+<rect x="136" y="472" width="210" height="9" rx="4" fill="#7fb069" fill-opacity="0.55"/>
+<rect x="136" y="496" width="150" height="9" rx="4" fill="#7fb069" fill-opacity="0.22"/>
+<rect x="136" y="520" width="250" height="9" rx="4" fill="#7fb069" fill-opacity="0.22"/>
+<rect x="136" y="544" width="120" height="9" rx="4" fill="#7fb069" fill-opacity="0.22"/>
+<rect x="136" y="568" width="180" height="9" rx="4" fill="#7fb069" fill-opacity="0.22"/>
+<rect x="118" y="420" width="320" height="34" rx="8" fill="#171923"/>
+<rect x="118" y="440" width="320" height="14" fill="#171923"/>
+<text x="132" y="443" font-family="JetBrainsMono Nerd Font, monospace" font-weight="700" font-size="16" fill="#f4f4f5">Terminal</text>
+<rect x="118" y="420" width="320" height="178" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1.5"/>
+</g>
+<g>
+<rect x="466" y="420" width="320" height="178" rx="8" fill="#1b1e28"/>
+<rect x="484" y="472" width="150" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.55"/>
+<rect x="484" y="496" width="250" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.22"/>
+<rect x="484" y="520" width="120" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.22"/>
+<rect x="484" y="544" width="180" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.22"/>
+<rect x="484" y="568" width="210" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.22"/>
+<rect x="466" y="420" width="320" height="34" rx="8" fill="#171923"/>
+<rect x="466" y="440" width="320" height="14" fill="#171923"/>
+<text x="480" y="443" font-family="JetBrainsMono Nerd Font, monospace" font-weight="700" font-size="16" fill="#f4f4f5">Browser</text>
+<rect x="466" y="420" width="320" height="178" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1.5"/>
+</g>
+<g>
+<rect x="814" y="420" width="320" height="178" rx="8" fill="#1b1e28"/>
+<rect x="832" y="472" width="250" height="9" rx="4" fill="#e8a838" fill-opacity="0.55"/>
+<rect x="832" y="496" width="120" height="9" rx="4" fill="#e8a838" fill-opacity="0.22"/>
+<rect x="832" y="520" width="180" height="9" rx="4" fill="#e8a838" fill-opacity="0.22"/>
+<rect x="832" y="544" width="210" height="9" rx="4" fill="#e8a838" fill-opacity="0.22"/>
+<rect x="832" y="568" width="150" height="9" rx="4" fill="#e8a838" fill-opacity="0.22"/>
+<rect x="814" y="420" width="320" height="34" rx="8" fill="#171923"/>
+<rect x="814" y="440" width="320" height="14" fill="#171923"/>
+<text x="828" y="443" font-family="JetBrainsMono Nerd Font, monospace" font-weight="700" font-size="16" fill="#f4f4f5">Editor</text>
+<rect x="814" y="420" width="320" height="178" rx="8" fill="none" stroke="#e8a838" stroke-opacity="1" stroke-width="4"/>
+</g>
+<g>
+<rect x="1162" y="420" width="320" height="178" rx="8" fill="#1b1e28"/>
+<rect x="1180" y="472" width="120" height="9" rx="4" fill="#c792ea" fill-opacity="0.55"/>
+<rect x="1180" y="496" width="180" height="9" rx="4" fill="#c792ea" fill-opacity="0.22"/>
+<rect x="1180" y="520" width="210" height="9" rx="4" fill="#c792ea" fill-opacity="0.22"/>
+<rect x="1180" y="544" width="150" height="9" rx="4" fill="#c792ea" fill-opacity="0.22"/>
+<rect x="1180" y="568" width="250" height="9" rx="4" fill="#c792ea" fill-opacity="0.22"/>
+<rect x="1162" y="420" width="320" height="34" rx="8" fill="#171923"/>
+<rect x="1162" y="440" width="320" height="14" fill="#171923"/>
+<text x="1176" y="443" font-family="JetBrainsMono Nerd Font, monospace" font-weight="700" font-size="16" fill="#f4f4f5">Chat</text>
+<rect x="1162" y="420" width="320" height="178" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1.5"/>
+</g>
+<g>
+<rect x="118" y="622" width="320" height="178" rx="8" fill="#1b1e28"/>
+<rect x="136" y="674" width="180" height="9" rx="4" fill="#e8a838" fill-opacity="0.55"/>
+<rect x="136" y="698" width="210" height="9" rx="4" fill="#e8a838" fill-opacity="0.22"/>
+<rect x="136" y="722" width="150" height="9" rx="4" fill="#e8a838" fill-opacity="0.22"/>
+<rect x="136" y="746" width="250" height="9" rx="4" fill="#e8a838" fill-opacity="0.22"/>
+<rect x="136" y="770" width="120" height="9" rx="4" fill="#e8a838" fill-opacity="0.22"/>
+<rect x="118" y="622" width="320" height="34" rx="8" fill="#171923"/>
+<rect x="118" y="642" width="320" height="14" fill="#171923"/>
+<text x="132" y="645" font-family="JetBrainsMono Nerd Font, monospace" font-weight="700" font-size="16" fill="#f4f4f5">Notes</text>
+<rect x="118" y="622" width="320" height="178" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1.5"/>
+</g>
+<g>
+<rect x="466" y="622" width="320" height="178" rx="8" fill="#1b1e28"/>
+<rect x="484" y="674" width="210" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.55"/>
+<rect x="484" y="698" width="150" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.22"/>
+<rect x="484" y="722" width="250" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.22"/>
+<rect x="484" y="746" width="120" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.22"/>
+<rect x="484" y="770" width="180" height="9" rx="4" fill="#6aa7ff" fill-opacity="0.22"/>
+<rect x="466" y="622" width="320" height="34" rx="8" fill="#171923"/>
+<rect x="466" y="642" width="320" height="14" fill="#171923"/>
+<text x="480" y="645" font-family="JetBrainsMono Nerd Font, monospace" font-weight="700" font-size="16" fill="#f4f4f5">Docs</text>
+<rect x="466" y="622" width="320" height="178" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1.5"/>
+</g>
+<g>
+<rect x="814" y="622" width="320" height="178" rx="8" fill="#1b1e28"/>
+<rect x="832" y="674" width="150" height="9" rx="4" fill="#7fb069" fill-opacity="0.55"/>
+<rect x="832" y="698" width="250" height="9" rx="4" fill="#7fb069" fill-opacity="0.22"/>
+<rect x="832" y="722" width="120" height="9" rx="4" fill="#7fb069" fill-opacity="0.22"/>
+<rect x="832" y="746" width="180" height="9" rx="4" fill="#7fb069" fill-opacity="0.22"/>
+<rect x="832" y="770" width="210" height="9" rx="4" fill="#7fb069" fill-opacity="0.22"/>
+<rect x="814" y="622" width="320" height="34" rx="8" fill="#171923"/>
+<rect x="814" y="642" width="320" height="14" fill="#171923"/>
+<text x="828" y="645" font-family="JetBrainsMono Nerd Font, monospace" font-weight="700" font-size="16" fill="#f4f4f5">Music</text>
+<rect x="814" y="622" width="320" height="178" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1.5"/>
+</g>
+<g>
+<rect x="1162" y="622" width="320" height="178" rx="8" fill="#1b1e28"/>
+<rect x="1180" y="674" width="250" height="9" rx="4" fill="#8a93a6" fill-opacity="0.55"/>
+<rect x="1180" y="698" width="120" height="9" rx="4" fill="#8a93a6" fill-opacity="0.22"/>
+<rect x="1180" y="722" width="180" height="9" rx="4" fill="#8a93a6" fill-opacity="0.22"/>
+<rect x="1180" y="746" width="210" height="9" rx="4" fill="#8a93a6" fill-opacity="0.22"/>
+<rect x="1180" y="770" width="150" height="9" rx="4" fill="#8a93a6" fill-opacity="0.22"/>
+<rect x="1162" y="622" width="320" height="34" rx="8" fill="#171923"/>
+<rect x="1162" y="642" width="320" height="14" fill="#171923"/>
+<text x="1176" y="645" font-family="JetBrainsMono Nerd Font, monospace" font-weight="700" font-size="16" fill="#f4f4f5">Logs</text>
+<rect x="1162" y="622" width="320" height="178" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1.5"/>
+</g>
+<rect x="118" y="838" width="1364" height="8" rx="4" fill="#ffffff" fill-opacity="0.12"/>
+<rect x="364" y="838" width="573" height="8" rx="4" fill="#f4f4f5" fill-opacity="0.85"/>
+</svg>

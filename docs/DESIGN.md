@@ -1,4 +1,4 @@
-# Hyprscroll2D design
+# Omalattice design
 
 ## Mental model
 
@@ -19,7 +19,9 @@ least 36px of an adjacent maximum-sized row or column remains visible.
 - Directional focus prefers a window on the same row or column, then the
   nearest directional candidate.
 - Moving into an occupied cell swaps the two windows.
-- Moving into an empty cell preserves the hole and moves the window there.
+- Moving into an empty cell moves the window there. Empty columns and rows are
+  closed up whenever windows open, close or move, so the grid never has a blank
+  band between windows. The camera keeps pointing at the same window.
 - The camera follows focus unless the user explicitly pans it.
 - Width and height use discrete presets to prevent accidental overlaps.
 - Overview mode scales every workspace window into the viewport. Directional

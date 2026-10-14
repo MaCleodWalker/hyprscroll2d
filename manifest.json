@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.kirollosatef.hyprscroll2d",
-  "name": "Hyprscroll2D",
-  "version": "0.2.0",
-  "author": "Kirollos Atef",
+  "id": "io.github.macleodwalker.omalattice",
+  "name": "Omalattice",
+  "version": "0.3.0",
+  "author": "MaCleod Walker",
   "license": "MIT",
-  "description": "An infinite two-dimensional scrolling workspace layout for Hyprland.",
+  "description": "A two-dimensional scrolling workspace layout for Omarchy with a live thumbnail overview, minimum-size scrolling and Super+L rotation.",
   "kinds": [
     "service"
   ],

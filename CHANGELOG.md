@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.3.0 - 2026-10-14
+
+Omalattice is a fork of Hyprscroll2D by kirollosatef. Entries below this
+release were published upstream as Hyprscroll2D.
+
+- Rename the project, plugin ID (`io.github.macleodwalker.omalattice`), layout
+  and state files to Omalattice.
+- Show live scaled thumbnails with titles on the workspace overview, so windows
+  no longer resize or appear zoomed in.
+- Add three-finger up/down swipes that focus windows in Omalattice.
+- Add Omalattice to the `Super+L` layout rotation (dwindle, scrolling,
+  Omalattice) and remember the workspaces that use it.
+- Make `workspace` in `layout/config.lua` optional instead of defaulting to 9.
+- Close up empty columns and rows when windows close or move, so the grid has
+  no blank space between windows.
+- Keep overview windows at least a quarter of the viewport in size and scroll
+  larger workspaces with scroll bars, wheel scrolling and selection follow.
+
 ## v0.2.0 - 2026-08-24
 
 - Add native installation through `omarchy plugin add`.
