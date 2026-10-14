@@ -22,6 +22,11 @@ end
 local bindings = {}
 local dispatched = {}
 local gestures = {}
+local live_gestures = {}
+local natural_scroll = false
+local gesture_errors = 0
+local timers = {}
+local handlers = {}
 local active_layout = "lua:omalattice"
 local active_workspace = { id = 3, tiled_layout = "dwindle", special = false }
 local workspace_rules = {}
@@ -56,15 +61,37 @@ _G.hl = {
     layout = {
         register = function() end,
     },
-    on = function()
+    on = function(event, handler)
+        handlers[event] = handlers[event] or {}
+        table.insert(handlers[event], handler)
         return true
+    end,
+    timer = function(callback, options)
+        table.insert(timers, { callback = callback, options = options })
+        return { set_enabled = function() end }
     end,
     unbind = function() end,
     gesture = function(spec)
+        if spec.action == "unset" then
+            for index, existing in ipairs(live_gestures) do
+                if existing.fingers == spec.fingers and existing.direction == spec.direction then
+                    table.remove(live_gestures, index)
+                    return
+                end
+            end
+            -- Hyprland logs this instead of raising it.
+            gesture_errors = gesture_errors + 1
+            return
+        end
         table.insert(gestures, spec)
+        table.insert(live_gestures, spec)
     end,
     workspace_rule = function(rule)
         table.insert(workspace_rules, rule)
+    end,
+    get_config = function(key)
+        assert(key == "input.touchpad.natural_scroll", "unexpected config key " .. key)
+        return natural_scroll
     end,
     get_active_workspace = function()
         return active_workspace
@@ -89,6 +116,9 @@ _G.hl = {
         },
     },
 }
+
+hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
+gestures = {}
 
 assert(loadfile(root .. "/integration/omarchy.lua"))()
 assert(terminal_action_creations == 1, "terminal binding should be captured during integration setup")
@@ -130,6 +160,13 @@ assert(dispatched[#dispatched].kind == "layout", "up gesture did not focus in Om
 assert(dispatched[#dispatched].message == "focus up", "up gesture sent the wrong layout command")
 gestures[2].action()
 assert(dispatched[#dispatched].message == "focus down", "down gesture sent the wrong layout command")
+
+natural_scroll = true
+gestures[1].action()
+assert(dispatched[#dispatched].message == "focus down", "natural scrolling should invert the up swipe")
+gestures[2].action()
+assert(dispatched[#dispatched].message == "focus up", "natural scrolling should invert the down swipe")
+natural_scroll = false
 
 active_layout = "scrolling"
 local gesture_dispatch_count = #dispatched
@@ -178,6 +215,71 @@ bindings["SUPER + L"]()
 assert(last_exec() == "omarchy-hyprland-workspace-layout-toggle", "special workspace should use Omarchy's toggle")
 assert(saved_workspaces() == "", "special workspace was saved")
 
+-- Horizontal swipes switch workspaces, except on an Omalattice workspace where
+-- they move focus. The workspace swipe is put back when leaving.
+local function find_gesture(direction)
+    for _, gesture in ipairs(live_gestures) do
+        if gesture.direction == direction then return gesture end
+    end
+end
+local function activate_workspace(workspace)
+    active_workspace = workspace
+    for _, handler in ipairs(handlers["workspace.active"]) do handler() end
+end
+
+assert(find_gesture("horizontal") and not find_gesture("left"), "workspace swipe should stay on other layouts")
+activate_workspace({ id = 3, tiled_layout = "lua:omalattice", special = false })
+assert(not find_gesture("horizontal"), "workspace swipe should yield on an Omalattice workspace")
+assert(find_gesture("left") and find_gesture("right"), "left/right focus swipes were not installed")
+active_layout = "lua:omalattice"
+find_gesture("left").action()
+assert(dispatched[#dispatched].message == "focus left", "left swipe sent the wrong layout command")
+find_gesture("right").action()
+assert(dispatched[#dispatched].message == "focus right", "right swipe sent the wrong layout command")
+natural_scroll = true
+find_gesture("left").action()
+assert(dispatched[#dispatched].message == "focus right", "natural scrolling should invert the left swipe")
+find_gesture("right").action()
+assert(dispatched[#dispatched].message == "focus left", "natural scrolling should invert the right swipe")
+natural_scroll = false
+activate_workspace({ id = 3, tiled_layout = "lua:omalattice", special = false })
+assert(#live_gestures == 4, "repeated sync should not duplicate gestures")
+activate_workspace({ id = 4, tiled_layout = "scrolling", special = false })
+assert(find_gesture("horizontal") and not find_gesture("left") and not find_gesture("right"),
+    "workspace swipe was not restored")
+assert(#live_gestures == 3, "gesture swap leaked a gesture")
+
+-- Rotating the layout refreshes the gestures once the toggle has applied.
+timers = {}
+active_workspace = { id = 3, tiled_layout = "dwindle", special = false }
+bindings["SUPER + L"]()
+assert(#timers == 1 and timers[1].options.type == "oneshot", "rotation did not schedule a resync")
+active_workspace = { id = 3, tiled_layout = "lua:omalattice", special = false }
+timers[1].callback()
+assert(find_gesture("left") and not find_gesture("horizontal"), "resync did not swap the gestures")
+activate_workspace({ id = 4, tiled_layout = "scrolling", special = false })
+
+assert(gesture_errors == 0, "gesture swaps must never remove a missing gesture")
+
+-- Without a workspace swipe the focus swipes are simply always on and nothing is removed.
+local real_dofile = dofile
+_G.dofile = function(path)
+    local loaded = real_dofile(path)
+    if path:match("config%.lua$") then loaded.workspace_swipe = false end
+    return loaded
+end
+_G.__omalattice_omarchy_integrated = nil
+live_gestures = {}
+handlers = {}
+assert(loadfile(root .. "/integration/omarchy.lua"))()
+_G.dofile = real_dofile
+assert(find_gesture("left") and find_gesture("right") and not find_gesture("horizontal"),
+    "focus swipes should be always on without a workspace swipe")
+activate_workspace({ id = 3, tiled_layout = "lua:omalattice", special = false })
+activate_workspace({ id = 4, tiled_layout = "scrolling", special = false })
+assert(#live_gestures == 4 and gesture_errors == 0, "swipes should not be swapped without a workspace swipe")
+_G.__omalattice_omarchy_integrated = true
+
 -- Scroll binds are consuming, so they stay off until an overview is open.
 for _, key in ipairs({ "mouse_down", "mouse_up", "mouse_left", "mouse_right" }) do
     assert(scroll_binds[key] and not scroll_binds[key].enabled, key .. " scroll bind should start disabled")
@@ -203,8 +305,10 @@ workspace_rules = {}
 assert(loadfile(root .. "/integration/plugin.lua"))()
 assert(#workspace_rules == 2 and workspace_rules[1].workspace == "5" and workspace_rules[2].workspace == "7",
     "plugin did not restore saved workspaces")
+timers = {}
 workspace_rules = {}
 assert(loadfile(root .. "/integration/plugin.lua"))()
+assert(#timers == 1, "restored workspaces should schedule a gesture resync")
 assert(#workspace_rules == 2, "plugin reload did not reapply saved workspaces")
 
 local config = assert(loadfile(root .. "/layout/config.lua"))()

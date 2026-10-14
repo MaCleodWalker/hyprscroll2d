@@ -15,10 +15,11 @@ end
 
 local function route(message, fallback)
     return function()
+        local text = type(message) == "function" and message() or message
         local active_layout = is_omalattice_active()
         local overview_active = rawget(_G, "__omalattice_is_overview_active")
-        if active_layout and (message ~= "overview-exit" or (overview_active and overview_active())) then
-            hl.dispatch(hl.dsp.layout(message))
+        if active_layout and (text ~= "overview-exit" or (overview_active and overview_active())) then
+            hl.dispatch(hl.dsp.layout(text))
         elseif fallback then
             local dispatcher = fallback()
             if dispatcher then hl.dispatch(dispatcher) end
@@ -37,11 +38,27 @@ local source = debug and debug.getinfo(1, "S").source
 if type(source) ~= "string" or source:sub(1, 1) ~= "@" then
     error("omalattice: unable to resolve integration directory")
 end
-local workspaces = dofile(source:sub(2):match("^(.*)/[^/]*$") .. "/workspaces.lua")
+local integration_dir = source:sub(2):match("^(.*)/[^/]*$")
+local workspaces = dofile(integration_dir .. "/workspaces.lua")
+local config = dofile(integration_dir:match("^(.*)/integration$") .. "/layout/config.lua")
 
 local TOGGLE_LAYOUT = "omarchy-hyprland-workspace-layout-toggle"
 -- Same icon Omarchy uses when it announces a workspace layout change.
 local LAYOUT_ICON = "\243\177\130\172"
+
+local sync_horizontal_gestures
+
+-- The toggle script changes the layout asynchronously and no event announces it,
+-- so layout-dependent state is refreshed shortly afterwards.
+local function resync_later()
+    hl.timer(function()
+        sync_horizontal_gestures()
+        local hover = rawget(_G, "__omalattice_hover")
+        if type(hover) == "table" then hover.sync() end
+    end, { timeout = 400, type = "oneshot" })
+end
+
+_G.__omalattice_resync_later = resync_later
 
 -- Extends Omarchy's dwindle <-> scrolling toggle into
 -- dwindle -> scrolling -> Omalattice -> dwindle for the focused workspace.
@@ -56,6 +73,7 @@ local function rotate_layout()
             hl.dispatch(hl.dsp.exec_cmd(
                 "omarchy-notification-send -g " .. LAYOUT_ICON .. " 'Workspace layout set to omalattice'"
             ))
+            resync_later()
             return
         end
     elseif current == workspaces.LAYOUT and id then
@@ -67,6 +85,7 @@ local function rotate_layout()
     end
 
     hl.dispatch(hl.dsp.exec_cmd(TOGGLE_LAYOUT))
+    resync_later()
 end
 
 hl.unbind("SUPER + L")
@@ -117,16 +136,70 @@ end)
 replace("SUPER + CTRL + UP", "Pan 2D canvas up", "pan up")
 replace("SUPER + CTRL + DOWN", "Pan 2D canvas down", "pan down")
 
+local GESTURE_FINGERS = config.gesture_fingers or 3
+
+-- With natural scrolling the content follows the fingers, so swiping up
+-- reveals the window below. The touchpad setting is read on every swipe.
+local function natural_scroll()
+    local ok, value = pcall(hl.get_config, "input.touchpad.natural_scroll")
+    return ok and value == true
+end
+
+local function swipe_focus(swipe, natural_target)
+    return function()
+        return "focus " .. (natural_scroll() and natural_target or swipe)
+    end
+end
+
 hl.gesture({
-    fingers = 3,
+    fingers = GESTURE_FINGERS,
     direction = "up",
-    action = route("focus up"),
+    action = route(swipe_focus("up", "down")),
 })
 hl.gesture({
-    fingers = 3,
+    fingers = GESTURE_FINGERS,
     direction = "down",
-    action = route("focus down"),
+    action = route(swipe_focus("down", "up")),
 })
+
+-- Hyprland has a single gesture per direction and no fallback, and a horizontal
+-- swipe is normally taken by the workspace swipe. Swap it for left/right focus
+-- gestures while an Omalattice workspace is active, then restore it. Hyprland
+-- cannot report which gestures exist and logs an error for removing a missing
+-- one, so this only happens when config.workspace_swipe says there is one.
+local focus_gestures = {
+    { fingers = GESTURE_FINGERS, direction = "left", action = route(swipe_focus("left", "right")) },
+    { fingers = GESTURE_FINGERS, direction = "right", action = route(swipe_focus("right", "left")) },
+}
+local workspace_gesture = { fingers = GESTURE_FINGERS, direction = "horizontal", action = "workspace" }
+local swap_workspace_swipe = config.workspace_swipe ~= false
+local horizontal_focus = false
+
+local function unset(gesture)
+    hl.gesture({ fingers = gesture.fingers, direction = gesture.direction, action = "unset" })
+end
+
+function sync_horizontal_gestures()
+    if not swap_workspace_swipe then return end
+
+    local ok, workspace = pcall(hl.get_active_workspace)
+    local want = ok and safe_field(workspace, "tiled_layout") == workspaces.LAYOUT
+        and not safe_field(workspace, "special") or false
+    if want == horizontal_focus then return end
+    horizontal_focus = want
+
+    if want then
+        unset(workspace_gesture)
+        for _, gesture in ipairs(focus_gestures) do hl.gesture(gesture) end
+    else
+        for _, gesture in ipairs(focus_gestures) do unset(gesture) end
+        hl.gesture(workspace_gesture)
+    end
+end
+
+if not swap_workspace_swipe then
+    for _, gesture in ipairs(focus_gestures) do hl.gesture(gesture) end
+end
 
 -- Wheel and touchpad scrolling pan a scrollable overview. Scroll binds consume
 -- the event, so they are only enabled while the focused workspace shows its
@@ -155,6 +228,11 @@ end
 _G.__omalattice_overview_changed = sync_scroll_binds
 hl.on("workspace.active", sync_scroll_binds)
 hl.on("window.active", sync_scroll_binds)
+
+hl.on("workspace.active", sync_horizontal_gestures)
+hl.on("monitor.focused", sync_horizontal_gestures)
+hl.on("window.active", sync_horizontal_gestures)
+sync_horizontal_gestures()
 
 replace("SUPER + code:20", "Grow window width", "resize width grow", function()
     return hl.dsp.window.resize({ x = -100, y = 0, relative = true })

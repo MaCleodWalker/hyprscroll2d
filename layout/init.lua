@@ -102,17 +102,51 @@ local function workspace_key(ctx)
     return "global"
 end
 
-_G.__omalattice_is_overview_active = function()
+local function active_state()
     local ok, window = pcall(hl.get_active_window)
-    if not ok or not window then return false end
+    if not ok or not window then return nil end
 
     local workspace = safe_field(window, "workspace")
     local id = safe_field(workspace, "id")
     local name = safe_field(workspace, "name")
-    local state = id and workspaces["workspace:" .. tostring(id)]
+    return id and workspaces["workspace:" .. tostring(id)]
         or name and workspaces["workspace-name:" .. tostring(name)]
         or workspaces.global
+end
+
+_G.__omalattice_is_overview_active = function()
+    local state = active_state()
     return state and state.overview == true or false
+end
+
+-- Pans a scrollable overview while the pointer rests near the edge of the viewport.
+local AUTOSCROLL_MS = 16
+local autoscroll_timer = nil
+
+local function autoscroll_tick()
+    local state = active_state()
+    local area = state and state.overview and state.view_area
+    if not area then return end
+
+    local ok, point = pcall(hl.get_cursor_pos)
+    if not ok or not point then return end
+    local vx, vy = core.edge_scroll_velocity(point, area, config)
+    if vx == 0 and vy == 0 then return end
+
+    local seconds = AUTOSCROLL_MS / 1000
+    if core.scroll_overview_by(state, vx * seconds, vy * seconds, area, config) then
+        hl.dispatch(hl.dsp.layout("refresh"))
+    end
+end
+
+local function set_autoscroll(enabled)
+    local speed = config.overview_autoscroll_speed
+    if type(speed) ~= "number" or speed <= 0 then return end
+    if not autoscroll_timer then
+        if not enabled then return end
+        autoscroll_timer = hl.timer(autoscroll_tick, { timeout = AUTOSCROLL_MS, type = "repeat" })
+    end
+    autoscroll_timer:set_enabled(enabled)
 end
 
 local function describe(ctx)
@@ -158,6 +192,8 @@ local function focus_descriptor(descriptor)
 end
 
 local function overview_changed()
+    local state = active_state()
+    set_autoscroll(state ~= nil and state.overview == true)
     local callback = rawget(_G, "__omalattice_overview_changed")
     if callback then pcall(callback) end
 end
@@ -165,6 +201,7 @@ end
 local function recalculate(ctx)
     local state, descriptors = context(ctx)
     local placements
+    state.view_area = state.overview and ctx.area or nil
     if state.overview then
         local tiles = core.overview_placements(state, ctx.area, config)
         write_overview_status(workspace_key(ctx), true, overview_payload(ctx, state, descriptors, tiles))
@@ -191,6 +228,16 @@ local function recalculate(ctx)
         local placement = placements[id]
         if placement then descriptor.target:place(placement) end
     end
+
+    -- A click in the overview leaves the pointer over its thumbnail, so move it
+    -- into the window that was just entered.
+    if state.recenter_cursor and not state.overview then
+        state.recenter_cursor = nil
+        local active = placements[state.focused_id]
+        if active then
+            hl.dispatch(hl.dsp.cursor.move({ x = active.x + active.w / 2, y = active.y + active.h / 2 }))
+        end
+    end
 end
 
 local function layout_msg(ctx, message)
@@ -212,7 +259,10 @@ local function layout_msg(ctx, message)
         if not ok then return "omalattice: unable to update overview status: " .. tostring(err) end
         core.set_overview(state, enabled)
         overview_changed()
+    elseif command == "refresh" then
+        return true
     elseif command == "overview-exit" then
+        state.recenter_cursor = argument == "click" or nil
         local ok, err = write_overview_status(workspace_key(ctx), false)
         if not ok then return "omalattice: unable to update overview status: " .. tostring(err) end
         core.set_overview(state, false)
@@ -268,6 +318,17 @@ if not rawget(_G, "__omalattice_focus_subscription") then
         end)
     end)
     if ok then _G.__omalattice_focus_subscription = subscription or true end
+end
+
+if not rawget(_G, "__omalattice_hover") then
+    local ok, hover = pcall(function()
+        return load_relative("hover.lua").start(config, _G.__omalattice_is_overview_active)
+    end)
+    if ok then
+        _G.__omalattice_hover = hover or true
+    else
+        io.stderr:write("omalattice: unable to start hover focus: " .. tostring(hover) .. "\n")
+    end
 end
 
 hl.layout.register("omalattice", {

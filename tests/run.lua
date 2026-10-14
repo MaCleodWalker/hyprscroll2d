@@ -196,6 +196,45 @@ test("overview scrolls by wheel and clamps at the content edges", function()
     assert(not core.scroll_overview(state, "sideways", area, config), "unknown direction was accepted")
 end)
 
+test("overview scrolls by a distance and reports whether it moved", function()
+    local state = spread(8)
+    local area = { x = 0, y = 0, w = 1000, h = 800 }
+    core.set_overview(state, true)
+    core.overview_placements(state, area, config)
+
+    assert(core.scroll_overview_by(state, 40, 0, area, config), "scrolling by a distance did not move")
+    equal(state.overview_scroll.x, 40, "scroll distance")
+    assert(core.scroll_overview_by(state, -500, 0, area, config), "scrolling back should move")
+    equal(state.overview_scroll.x, 0, "scroll should clamp at the start")
+    assert(not core.scroll_overview_by(state, -10, 0, area, config), "scrolling past the start should not move")
+end)
+
+test("overview auto-scroll speeds up toward the viewport edges", function()
+    local area = { x = 100, y = 50, w = 1000, h = 800 }
+    local function velocity(x, y, speed)
+        return core.edge_scroll_velocity({ x = x, y = y }, area, { overview_autoscroll_speed = speed or 900 })
+    end
+
+    local vx, vy = velocity(600, 450)
+    equal(vx, 0, "centre x") equal(vy, 0, "centre y")
+    vx = velocity(100, 450)
+    equal(vx, -900, "left edge")
+    vx = velocity(1100, 450)
+    equal(vx, 900, "right edge")
+    local _, top = velocity(600, 50)
+    equal(top, -900, "top edge")
+    local _, bottom = velocity(600, 850)
+    equal(bottom, 900, "bottom edge")
+    local near = velocity(100 + 48, 450)
+    assert(near < 0 and near > -900, "speed should ease toward the middle")
+    vx, vy = velocity(1105, 450)
+    equal(vx, 0, "outside the viewport") equal(vy, 0, "outside the viewport y")
+    vx = velocity(100, 450, 0)
+    equal(vx, 0, "disabled")
+    vx = core.edge_scroll_velocity({ x = 100, y = 450 }, area, {})
+    equal(vx, 0, "unset")
+end)
+
 test("overview scrolls the selected window into view", function()
     local state = spread(8)
     local area = { x = 0, y = 0, w = 1000, h = 800 }

@@ -7,6 +7,8 @@ local dispatched = {}
 local active_callback = nil
 local dispatch_context = nil
 local cursor = nil
+local timer_callback = nil
+local timer_enabled = nil
 local overview_status = nil
 local original_getenv = os.getenv
 local original_open = io.open
@@ -35,12 +37,17 @@ _G.hl = {
             registered = { name = name, provider = provider }
         end,
     },
-    on = function(_, callback)
-        active_callback = callback
+    on = function(event, callback)
+        if event == "window.active" and not active_callback then active_callback = callback end
         return true
     end,
     get_active_window = function()
         return { workspace = { id = 9 } }
+    end,
+    get_cursor_pos = function() return cursor end,
+    timer = function(callback)
+        timer_callback = callback
+        return { set_enabled = function(_, value) timer_enabled = value end }
     end,
     dispatch = function(dispatcher)
         table.insert(dispatched, dispatcher)
@@ -260,6 +267,46 @@ assert(registered.provider.layout_msg(legacy, "overview") == true, "legacy overv
 registered.provider.recalculate(legacy)
 assert(legacy_a.placed.w < full_width, "legacy overview should resize the real windows")
 assert(overview_status:find('"thumbnails":false', 1, true), "legacy overview should not request thumbnails")
+
+-- A crowded overview pans on its own while the pointer rests near an edge.
+local crowded9_targets = {}
+for i = 1, 8 do crowded9_targets[i] = target("auto" .. i, i == 1, 9) end
+local crowded9 = { area = { x = 100, y = 200, w = 1000, h = 800 }, targets = crowded9_targets }
+registered.provider.recalculate(crowded9)
+assert(registered.provider.layout_msg(crowded9, "overview") == true, "overview command was rejected")
+assert(timer_callback and timer_enabled == true, "auto-scroll did not start with the overview")
+dispatch_context = crowded9
+registered.provider.recalculate(crowded9)
+local first_tile = tile("0xauto1")
+
+cursor = { x = 600, y = 600 }
+dispatch_count = #dispatched
+timer_callback()
+assert(#dispatched == dispatch_count, "a centred pointer should not scroll")
+
+cursor = { x = 1099, y = 600 }
+timer_callback()
+assert(dispatched[#dispatched].message == "refresh", "an edge pointer did not refresh the overview")
+assert(tile("0xauto1") < first_tile, "the overview did not pan toward the pointer")
+
+cursor = { x = 500, y = 600 }
+for _ = 1, 400 do
+    cursor = { x = 1099, y = 600 }
+    timer_callback()
+end
+dispatch_count = #dispatched
+timer_callback()
+assert(#dispatched == dispatch_count, "scrolling should stop at the end of the content")
+
+-- Clicking a thumbnail closes the overview and moves the pointer into the window.
+cursor = { x = 5, y = 5 }
+registered.provider.layout_msg(crowded9, "overview-exit click")
+assert(timer_enabled == false, "auto-scroll kept running after the overview closed")
+registered.provider.recalculate(crowded9)
+local entered = crowded9_targets[1].placed
+assert(cursor.x == entered.x + entered.w / 2 and cursor.y == entered.y + entered.h / 2,
+    "the pointer did not move into the entered window")
+dispatch_context = nil
 
 os.getenv = original_getenv
 io.open = original_open
