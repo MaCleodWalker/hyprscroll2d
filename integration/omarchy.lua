@@ -71,6 +71,7 @@ end
 
 hl.unbind("SUPER + L")
 o.bind("SUPER + L", "Toggle workspace layout", rotate_layout)
+_G.__hyprscroll2d_rotate_layout = rotate_layout
 
 replace("SUPER + LEFT", "Focus left", "focus left", function()
     return hl.dsp.focus({ direction = "l" })

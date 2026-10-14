@@ -139,6 +139,7 @@ local function last_exec()
 end
 
 assert(type(bindings["SUPER + L"]) == "function", "layout rotation binding was not installed")
+assert(_G.__hyprscroll2d_rotate_layout == bindings["SUPER + L"], "layout rotation was not exposed")
 
 -- dwindle -> scrolling is left to Omarchy's own toggle.
 active_workspace = { id = 3, tiled_layout = "dwindle", special = false }
