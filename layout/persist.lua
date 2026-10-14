@@ -134,8 +134,13 @@ function M.write(saved)
     local dir, path = state_dir(), M.path()
     if not dir then return nil, "no state directory" end
 
-    local mkdir = io.popen("mkdir -p " .. shell_quote(dir))
-    if mkdir then mkdir:close() end
+    -- Titles can be private, so the directory and file are owner-only, including
+    -- ones created by earlier versions with default permissions.
+    local prepare = io.popen("umask 077; mkdir -p " .. shell_quote(dir)
+        .. " && chmod 700 " .. shell_quote(dir)
+        .. " && touch " .. shell_quote(path)
+        .. " && chmod 600 " .. shell_quote(path))
+    if prepare then prepare:close() end
 
     local file, err = io.open(path, "w")
     if not file then return nil, err end
