@@ -9,6 +9,10 @@ return {
     gap_x = 12,
     gap_y = 12,
 
+    -- Draw live scaled thumbnails of each window in the overview (needs the
+    -- Omarchy shell service). Set to false to resize the real windows instead.
+    overview_thumbnails = true,
+
     -- Smallest a window cell may shrink to in the overview, as a fraction of
     -- the viewport. Larger workspaces scroll instead of shrinking further.
     overview_min_width = 0.25,

@@ -22,17 +22,21 @@ local overview_status_path = os.getenv("XDG_RUNTIME_DIR")
 
 local last_overview_status = nil
 
--- The shell reads "<workspace>|<overview>|<x start>,<x size>,<y start>,<y size>",
--- where the last field positions the overview scroll bars.
-local function write_overview_status(key, enabled, bars)
+local function json_string(value)
+    return '"' .. tostring(value):gsub('[%c"\\]', function(char)
+        return string.format("\\u%04x", char:byte())
+    end) .. '"'
+end
+
+-- The shell reads this JSON to draw the overview. "payload" carries the
+-- scroll bars and the window tiles while an overview is open.
+local function write_overview_status(key, enabled, payload)
     if not overview_status_path then
         return nil, "XDG_RUNTIME_DIR is not set"
     end
 
-    local status = key .. "|" .. (enabled and "true" or "false")
-    if enabled and bars then
-        status = status .. string.format("|%.4f,%.4f,%.4f,%.4f", bars.x.start, bars.x.size, bars.y.start, bars.y.size)
-    end
+    local status = string.format('{"workspace":%s,"overview":%s%s}',
+        json_string(key), enabled and "true" or "false", enabled and payload or "")
     if status == last_overview_status then return true end
 
     local file, err = io.open(overview_status_path, "w")
@@ -43,6 +47,25 @@ local function write_overview_status(key, enabled, bars)
     if not closed then return nil, close_err end
     last_overview_status = status
     return true
+end
+
+local function overview_payload(ctx, state, descriptors, tiles)
+    local bars = core.overview_scrollbars(state, ctx.area, config)
+    local entries = {}
+    for _, id in ipairs(state.ids) do
+        local descriptor, tile = descriptors[id], tiles[id]
+        if descriptor and descriptor.address and tile then
+            table.insert(entries, string.format('{"address":%s,"x":%.2f,"y":%.2f,"w":%.2f,"h":%.2f}',
+                json_string(descriptor.address), tile.x, tile.y, tile.w, tile.h))
+        end
+    end
+
+    return string.format(
+        ',"thumbnails":%s,"area":{"x":%.2f,"y":%.2f,"w":%.2f,"h":%.2f},"bars":[%.4f,%.4f,%.4f,%.4f],"tiles":[%s]',
+        config.overview_thumbnails ~= false and "true" or "false",
+        ctx.area.x, ctx.area.y, ctx.area.w, ctx.area.h,
+        bars.x.start, bars.x.size, bars.y.start, bars.y.size,
+        table.concat(entries, ","))
 end
 
 if overview_status_path then
@@ -141,12 +164,27 @@ end
 
 local function recalculate(ctx)
     local state, descriptors = context(ctx)
-    local placements = state.overview
-        and core.overview_placements(state, ctx.area, config)
-        or core.placements(state, ctx.area, config)
-
+    local placements
     if state.overview then
-        write_overview_status(workspace_key(ctx), true, core.overview_scrollbars(state, ctx.area, config))
+        local tiles = core.overview_placements(state, ctx.area, config)
+        write_overview_status(workspace_key(ctx), true, overview_payload(ctx, state, descriptors, tiles))
+        if config.overview_thumbnails ~= false then
+            -- The shell draws the thumbnails, so the windows keep their size. They are
+            -- stacked on screen because the compositor only captures visible windows.
+            placements = {}
+            for id, box in pairs(core.placements(state, ctx.area, config)) do
+                placements[id] = {
+                    x = ctx.area.x + (ctx.area.w - box.w) / 2,
+                    y = ctx.area.y + (ctx.area.h - box.h) / 2,
+                    w = box.w,
+                    h = box.h,
+                }
+            end
+        else
+            placements = tiles
+        end
+    else
+        placements = core.placements(state, ctx.area, config)
     end
 
     for id, descriptor in pairs(descriptors) do

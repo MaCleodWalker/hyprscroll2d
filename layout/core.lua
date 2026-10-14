@@ -356,10 +356,18 @@ local function overview_metrics(state, area, config)
     local gap_y = row_count > 1 and math.max(0, math.min(config.gap_y or 0, max_gap_y)) or 0
     local fit_width = (usable_width - (gap_x * (column_count - 1))) / column_count
     local fit_height = (usable_height - (gap_y * (row_count - 1))) / row_count
-    local min_width = area.w * clamp(config.overview_min_width or 0.25, 0, 1)
-    local min_height = area.h * clamp(config.overview_min_height or 0.25, 0, 1)
-    local cell_width = math.max(fit_width, min_width)
-    local cell_height = math.max(fit_height, min_height)
+    local min_fraction_x = clamp(config.overview_min_width or 0.25, 0, 1)
+    local min_fraction_y = clamp(config.overview_min_height or 0.25, 0, 1)
+    local cell_width, cell_height
+    if config.overview_thumbnails ~= false then
+        -- Thumbnails scale every window by the same factor, so cells keep the
+        -- proportions of the viewport and the windows keep their shapes.
+        local scale = math.max(math.min(fit_width / area.w, fit_height / area.h), min_fraction_x, min_fraction_y)
+        cell_width, cell_height = area.w * scale, area.h * scale
+    else
+        cell_width = math.max(fit_width, area.w * min_fraction_x)
+        cell_height = math.max(fit_height, area.h * min_fraction_y)
+    end
 
     return {
         column_index = column_index,
@@ -373,6 +381,11 @@ local function overview_metrics(state, area, config)
         content_width = (padding_x * 2) + (cell_width * column_count) + (gap_x * (column_count - 1)),
         content_height = (padding_y * 2) + (cell_height * row_count) + (gap_y * (row_count - 1)),
     }
+end
+
+-- Content smaller than the viewport is centered instead of hugging a corner.
+local function centering(metrics, area)
+    return math.max(0, (area.w - metrics.content_width) / 2), math.max(0, (area.h - metrics.content_height) / 2)
 end
 
 -- Keep one cell axis inside the viewport, preferring the leading edge.
@@ -404,15 +417,16 @@ function M.overview_placements(state, area, config)
     scroll.y = clamp(scroll.y, 0, math.max(0, metrics.content_height - area.h))
 
     local placements = {}
+    local offset_x, offset_y = centering(metrics, area)
 
     for id, position in pairs(state.positions) do
         local width_step = clamp(state.width_step_by_id[id] or config.default_width_step, 1, #config.width_steps)
         local height_step = clamp(state.height_step_by_id[id] or config.default_height_step, 1, #config.height_steps)
         local width = metrics.cell_width * config.width_steps[width_step]
         local height = metrics.cell_height * config.height_steps[height_step]
-        local cell_x = area.x + metrics.padding_x - scroll.x
+        local cell_x = area.x + offset_x + metrics.padding_x - scroll.x
             + ((metrics.column_index[position.col] - 1) * (metrics.cell_width + metrics.gap_x))
-        local cell_y = area.y + metrics.padding_y - scroll.y
+        local cell_y = area.y + offset_y + metrics.padding_y - scroll.y
             + ((metrics.row_index[position.row] - 1) * (metrics.cell_height + metrics.gap_y))
 
         placements[id] = {

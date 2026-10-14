@@ -9,7 +9,8 @@ Item {
 
     property bool loadPending: false
     property int refreshTick: 0
-    property string overviewState: "none|false"
+    readonly property var closedOverview: ({ workspace: "none", overview: false })
+    property var overview: closedOverview
     readonly property string overviewStatusPath: Quickshell.env("XDG_RUNTIME_DIR")
         + "/hyprscroll2d-overview"
     readonly property string bootstrapPath: decodeURIComponent(
@@ -40,11 +41,35 @@ Item {
         refreshTick += 1
     }
 
-    function clientsForScreen(screen, tick) {
+    function parseOverview(text) {
+        try {
+            const value = JSON.parse(text)
+            return value && typeof value === "object" ? value : root.closedOverview
+        } catch (error) {
+            return root.closedOverview
+        }
+    }
+
+    // Hyprland reports addresses with and without the 0x prefix; keep hex digits only.
+    function normalizeAddress(address) {
+        return String(address || "").replace(/^0x/, "").replace(/[^0-9a-fA-F]/g, "")
+    }
+
+    function toplevelFor(address, tick) {
         var ignored = tick
-        var monitor = Hyprland.monitorFor(screen)
-        var workspace = monitor ? monitor.activeWorkspace : null
-        return workspace && workspace.toplevels ? workspace.toplevels.values : []
+        var wanted = root.normalizeAddress(address)
+        var values = Hyprland.toplevels.values
+        for (var index = 0; index < values.length; index++) {
+            if (values[index] && root.normalizeAddress(values[index].address) === wanted) return values[index]
+        }
+        return null
+    }
+
+    function selectWindow(address) {
+        Quickshell.execDetached([
+            "hyprctl", "eval",
+            "hl.dispatch(hl.dsp.focus({ window = \"address:0x" + root.normalizeAddress(address) + "\" }))"
+        ])
     }
 
     Component.onCompleted: {
@@ -104,9 +129,9 @@ Item {
         id: overviewStatus
         path: root.overviewStatusPath
         watchChanges: true
-        onLoaded: root.overviewState = text().trim()
+        onLoaded: root.overview = root.parseOverview(text())
         onFileChanged: reload()
-        onLoadFailed: root.overviewState = "none|false"
+        onLoadFailed: root.overview = root.closedOverview
     }
 
     Variants {
@@ -128,18 +153,23 @@ Item {
                     targetScreen.width,
                     targetScreen.height
                 )
-                property var status: root.overviewState.split("|")
-                // Thumb start and size as fractions of each track: x start, x size, y start, y size.
-                readonly property var bars: {
-                    var values = status.length > 2 ? status[2].split(",").map(Number) : []
-                    return values.length === 4 && values.every(isFinite) ? values : [0, 1, 0, 1]
-                }
+                readonly property var overview: root.overview
                 readonly property bool workspaceMatches: !!(
                     monitor
                     && monitor.activeWorkspace
-                    && (status[0] === "workspace:" + monitor.activeWorkspace.id
-                        || status[0] === "workspace-name:" + monitor.activeWorkspace.name)
+                    && (overview.workspace === "workspace:" + monitor.activeWorkspace.id
+                        || overview.workspace === "workspace-name:" + monitor.activeWorkspace.name)
                 )
+                readonly property bool active: overview.overview === true && workspaceMatches
+                readonly property var tiles: active && overview.thumbnails === true && overview.tiles
+                    ? overview.tiles : []
+                readonly property var bars: overview.bars && overview.bars.length === 4
+                    ? overview.bars : [0, 1, 0, 1]
+                // The tiled area of the screen, in this screen's coordinates.
+                readonly property rect area: overview.area
+                    ? Qt.rect(overview.area.x - screenGeometry.x, overview.area.y - screenGeometry.y,
+                        overview.area.w, overview.area.h)
+                    : Qt.rect(0, 0, screenGeometry.width, screenGeometry.height)
 
                 screen: targetScreen
                 color: "transparent"
@@ -151,105 +181,146 @@ Item {
                 }
                 exclusiveZone: -1
                 focusable: false
-                visible: status[1] === "true" && workspaceMatches
+                visible: active
                 WlrLayershell.layer: WlrLayer.Overlay
                 WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-                Rectangle {
-                    id: verticalTrack
-                    visible: screenOverlay.bars[3] < 1
-                    x: screenOverlay.screenGeometry.width - width - 4
-                    y: 8
-                    width: 6
-                    height: screenOverlay.screenGeometry.height - 16
-                    radius: 3
-                    color: "#55171923"
-
-                    Rectangle {
-                        width: parent.width
-                        y: screenOverlay.bars[2] * parent.height
-                        height: Math.max(24, screenOverlay.bars[3] * parent.height)
-                        radius: 3
-                        color: "#ccf4f4f5"
-                    }
+                // Only the thumbnail area takes input, and only while thumbnails are drawn.
+                mask: Region {
+                    x: screenOverlay.area.x
+                    y: screenOverlay.area.y
+                    width: screenOverlay.tiles.length > 0 ? screenOverlay.area.width : 0
+                    height: screenOverlay.tiles.length > 0 ? screenOverlay.area.height : 0
                 }
 
-                Rectangle {
-                    id: horizontalTrack
-                    visible: screenOverlay.bars[1] < 1
-                    x: 8
-                    y: screenOverlay.screenGeometry.height - height - 4
-                    width: screenOverlay.screenGeometry.width - 16
-                    height: 6
-                    radius: 3
-                    color: "#55171923"
+                Item {
+                    id: viewport
+                    x: screenOverlay.area.x
+                    y: screenOverlay.area.y
+                    width: screenOverlay.area.width
+                    height: screenOverlay.area.height
+                    clip: true
 
                     Rectangle {
-                        height: parent.height
-                        x: screenOverlay.bars[0] * parent.width
-                        width: Math.max(24, screenOverlay.bars[1] * parent.width)
-                        radius: 3
-                        color: "#ccf4f4f5"
+                        anchors.fill: parent
+                        visible: screenOverlay.tiles.length > 0
+                        color: "#101216"
                     }
-                }
 
-                Repeater {
-                    model: root.clientsForScreen(screenOverlay.targetScreen, root.refreshTick)
-                        .filter(client => !!client)
+                    Repeater {
+                        model: screenOverlay.tiles
 
-                    delegate: Rectangle {
-                        required property var modelData
+                        delegate: Item {
+                            id: cell
+                            required property var modelData
 
-                        property var client: modelData
-                        property var windowData: client && client.lastIpcObject
-                            ? client.lastIpcObject : client
-                        property bool intersectsScreen: windowData
-                            && windowData.at
-                            && windowData.size
-                            && windowData.at[0]
-                                < screenOverlay.screenGeometry.x + screenOverlay.screenGeometry.width
-                            && windowData.at[1]
-                                < screenOverlay.screenGeometry.y + screenOverlay.screenGeometry.height
-                            && windowData.at[0] + windowData.size[0]
-                                > screenOverlay.screenGeometry.x
-                            && windowData.at[1] + windowData.size[1]
-                                > screenOverlay.screenGeometry.y
+                            readonly property var toplevel: root.toplevelFor(modelData.address, root.refreshTick)
+                            readonly property var info: toplevel && toplevel.lastIpcObject
+                                ? toplevel.lastIpcObject : null
+                            readonly property bool selected: !!Hyprland.activeToplevel
+                                && root.normalizeAddress(Hyprland.activeToplevel.address)
+                                    === root.normalizeAddress(modelData.address)
 
-                        x: windowData && windowData.at
-                            ? Math.max(8, Math.min(
-                                windowData.at[0] - screenOverlay.screenGeometry.x + 8,
-                                screenOverlay.screenGeometry.width - width - 8
-                            )) : 8
-                        y: windowData && windowData.at
-                            ? Math.max(8, Math.min(
-                                windowData.at[1] - screenOverlay.screenGeometry.y + 8,
-                                screenOverlay.screenGeometry.height - height - 8
-                            )) : 8
-                        width: windowData && windowData.size
-                            ? Math.max(1, Math.min(
-                                windowData.size[0] - 16,
-                                screenOverlay.screenGeometry.width - 16
-                            )) : 1
-                        height: titleText.implicitHeight + 16
-                        visible: !!windowData
-                            && windowData.mapped !== false
-                            && intersectsScreen
+                            x: modelData.x - screenOverlay.overview.area.x
+                            y: modelData.y - screenOverlay.overview.area.y
+                            width: modelData.w
+                            height: modelData.h
 
-                        radius: 5
-                        color: "#dd171923"
+                            // The thumbnail keeps the window's proportions inside its cell.
+                            Item {
+                                id: frame
+                                readonly property real fit: shot.hasContent
+                                    && shot.sourceSize.width > 0 && shot.sourceSize.height > 0
+                                    ? Math.min(cell.width / shot.sourceSize.width, cell.height / shot.sourceSize.height)
+                                    : 0
+                                width: fit > 0 ? shot.sourceSize.width * fit : cell.width
+                                height: fit > 0 ? shot.sourceSize.height * fit : cell.height
+                                anchors.centerIn: parent
 
-                        Text {
-                            id: titleText
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.leftMargin: 10
-                            anchors.rightMargin: 10
-                            text: windowData ? windowData.title || windowData.class || "" : ""
-                            color: "#f4f4f5"
-                            font.pixelSize: 13
-                            font.weight: Font.DemiBold
-                            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: "#1b1e28"
+                                }
+
+                                ScreencopyView {
+                                    id: shot
+                                    anchors.fill: parent
+                                    live: true
+                                    captureSource: cell.toplevel ? cell.toplevel.wayland : null
+                                }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 4
+                                    color: "transparent"
+                                    border.width: cell.selected ? 3 : 1
+                                    border.color: cell.selected ? "#e8a838" : "#55ffffff"
+                                }
+
+                                Rectangle {
+                                    id: titleBar
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    height: titleText.implicitHeight + 12
+                                    color: "#dd171923"
+
+                                    Text {
+                                        id: titleText
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.leftMargin: 10
+                                        anchors.rightMargin: 10
+                                        text: cell.info ? cell.info.title || cell.info.class || "" : ""
+                                        color: "#f4f4f5"
+                                        font.pixelSize: 13
+                                        font.weight: Font.DemiBold
+                                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                                    }
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: root.selectWindow(cell.modelData.address)
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        visible: screenOverlay.bars[3] < 1
+                        x: parent.width - width - 4
+                        y: 8
+                        width: 6
+                        height: parent.height - 16
+                        radius: 3
+                        color: "#55171923"
+
+                        Rectangle {
+                            width: parent.width
+                            y: screenOverlay.bars[2] * parent.height
+                            height: Math.max(24, screenOverlay.bars[3] * parent.height)
+                            radius: 3
+                            color: "#ccf4f4f5"
+                        }
+                    }
+
+                    Rectangle {
+                        visible: screenOverlay.bars[1] < 1
+                        x: 8
+                        y: parent.height - height - 4
+                        width: parent.width - 16
+                        height: 6
+                        radius: 3
+                        color: "#55171923"
+
+                        Rectangle {
+                            height: parent.height
+                            x: screenOverlay.bars[0] * parent.width
+                            width: Math.max(24, screenOverlay.bars[1] * parent.width)
+                            radius: 3
+                            color: "#ccf4f4f5"
                         }
                     }
                 }

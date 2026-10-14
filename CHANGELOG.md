@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Show window titles on the workspace overview.
+- Show live scaled thumbnails with titles on the workspace overview, so windows
+  no longer resize or appear zoomed in.
 - Add three-finger up/down swipes that focus windows in Hyprscroll2D.
 - Add Hyprscroll2D to the `Super+L` layout rotation (dwindle, scrolling,
   Hyprscroll2D) and remember the workspaces that use it.

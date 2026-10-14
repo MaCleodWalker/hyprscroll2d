@@ -18,7 +18,7 @@ visible, so you never lose the shape of your workspace.
 - Directional window movement with collision swapping
 - Independent width and height presets
 - Visible edge peeks for neighboring rows and columns
-- A compact overview of all workspace windows with title labels
+- A live thumbnail overview of all workspace windows with titles
 - Per-workspace in-memory layout state
 - Omarchy bindings that fall back to the normal action outside Hyprscroll2D
 
@@ -145,19 +145,24 @@ is active; the normal left/right workspace swipe remains unchanged.
 Hovering a neighboring edge peek focuses that window and centers the cursor
 inside it, so one mouse movement does not scroll through the whole row or column.
 
-In overview mode, windows are scaled down and labeled with their titles. Use
-`Super+Arrow` to select a window or click one directly, then press `Super+Enter`
-to return to it. `Super+M` and `Super+Escape` also exit overview mode.
+In overview mode, every window is shown as a live, scaled-down thumbnail with
+its title across the top. Use `Super+Arrow` to select a window or click one
+directly, then press `Super+Enter` to return to it. `Super+M` and
+`Super+Escape` also exit overview mode.
 
-Windows never shrink below a quarter of the viewport in each direction. When a
-workspace has too many windows to fit, the overview scrolls instead: scroll bars
-appear along the edges, the mouse wheel or touchpad scrolls the map, and
-selecting a window with the arrow keys scrolls it into view. Scrolling is only
-captured while an overview is open.
+Thumbnails are drawn by the Omarchy shell service, so the real windows keep
+their size and applications do not re-lay out while the overview is open.
+Thumbnails never shrink below a quarter of the viewport in each direction.
+When a workspace has too many windows to fit, the overview scrolls instead:
+scroll bars appear along the edges, the mouse wheel or touchpad scrolls the map,
+and selecting a window with the arrow keys scrolls it into view. Scrolling is
+only captured while an overview is open.
 
-Overview resizes the actual windows, so their contents respond to the smaller
-window size according to each application's normal resize behavior. The Lua
-custom-layout API cannot uniformly scale a client's rendered pixels.
+Without the shell service, set `overview_thumbnails = false` in
+[`layout/config.lua`](layout/config.lua). The overview then resizes the real
+windows instead, so their contents respond to the smaller size according to
+each application's normal resize behavior. The Lua custom-layout API cannot
+uniformly scale a client's rendered pixels.
 
 ## Customize the layout
 
@@ -169,6 +174,7 @@ Edit [`layout/config.lua`](layout/config.lua) to change:
 - `gap_x` and `gap_y`: spacing between cells
 - `width_steps` and `height_steps`: available size presets
 - `default_width_step` and `default_height_step`: initial window dimensions
+- `overview_thumbnails`: draw live thumbnails in the overview (default: `true`)
 - `overview_min_width` and `overview_min_height`: smallest overview window cell,
   as a fraction of the viewport (default: `0.25`)
 

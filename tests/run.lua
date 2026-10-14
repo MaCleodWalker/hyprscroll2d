@@ -155,6 +155,27 @@ test("overview never shrinks a cell below the minimum and scrolls instead", func
     equal(bars.y.size, 1, "vertical axis fits")
 end)
 
+test("overview thumbnails keep the window proportions and center small workspaces", function()
+    local state = spread(2)
+    local area = { x = 100, y = 50, w = 1000, h = 800 }
+    core.set_overview(state, true)
+    local placements = core.overview_placements(state, area, config)
+
+    local width_step, height_step = core.size_steps_of(state, "W1")
+    local expected = (config.height_steps[height_step] * area.h) / (config.width_steps[width_step] * area.w)
+    for _, placement in pairs(placements) do
+        assert(math.abs(placement.h / placement.w - expected) < 1e-6, "tile proportions drifted")
+    end
+
+    local left, right = placements.W1, placements.W2
+    local gap_left = left.x - area.x
+    local gap_right = (area.x + area.w) - (right.x + right.w)
+    assert(math.abs(gap_left - gap_right) < 1e-6, "tiles should be centered horizontally")
+    local top = math.min(left.y, right.y) - area.y
+    local bottom = (area.y + area.h) - math.max(left.y + left.h, right.y + right.h)
+    assert(math.abs(top - bottom) < 1e-6, "tiles should be centered vertically")
+end)
+
 test("overview scrolls by wheel and clamps at the content edges", function()
     local state = spread(8)
     local area = { x = 0, y = 0, w = 1000, h = 800 }
