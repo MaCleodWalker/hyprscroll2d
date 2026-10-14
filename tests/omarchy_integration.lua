@@ -12,7 +12,7 @@ os.getenv = function(name)
 end
 
 local function saved_workspaces()
-    local file = io.open(state_home .. "/hyprscroll2d/workspaces", "r")
+    local file = io.open(state_home .. "/omalattice/workspaces", "r")
     if not file then return "" end
     local content = file:read("*a")
     file:close()
@@ -22,13 +22,13 @@ end
 local bindings = {}
 local dispatched = {}
 local gestures = {}
-local active_layout = "lua:hyprscroll2d"
+local active_layout = "lua:omalattice"
 local active_workspace = { id = 3, tiled_layout = "dwindle", special = false }
 local workspace_rules = {}
 local terminal_launches = 0
 local terminal_action_creations = 0
 local overview_active = false
-_G.__hyprscroll2d_is_overview_active = function()
+_G.__omalattice_is_overview_active = function()
     return overview_active
 end
 
@@ -122,11 +122,11 @@ local dispatch_count = #dispatched
 bindings["SUPER + M"]()
 assert(#dispatched == dispatch_count, "overview toggle should not run in another layout")
 bindings["SUPER + RETURN"]()
-assert(terminal_launches == 2, "Enter should launch the Omarchy terminal outside Hyprscroll2D")
+assert(terminal_launches == 2, "Enter should launch the Omarchy terminal outside Omalattice")
 
-active_layout = "lua:hyprscroll2d"
+active_layout = "lua:omalattice"
 gestures[1].action()
-assert(dispatched[#dispatched].kind == "layout", "up gesture did not focus in Hyprscroll2D")
+assert(dispatched[#dispatched].kind == "layout", "up gesture did not focus in Omalattice")
 assert(dispatched[#dispatched].message == "focus up", "up gesture sent the wrong layout command")
 gestures[2].action()
 assert(dispatched[#dispatched].message == "focus down", "down gesture sent the wrong layout command")
@@ -137,7 +137,7 @@ gestures[1].action()
 gestures[2].action()
 assert(#dispatched == gesture_dispatch_count, "vertical gestures should not affect other layouts")
 
-active_layout = "lua:hyprscroll2d"
+active_layout = "lua:omalattice"
 bindings["SUPER + SHIFT + code:21"]()
 assert(dispatched[#dispatched].message == "resize height grow", "wrong height resize message")
 
@@ -147,7 +147,7 @@ local function last_exec()
 end
 
 assert(type(bindings["SUPER + L"]) == "function", "layout rotation binding was not installed")
-assert(_G.__hyprscroll2d_rotate_layout == bindings["SUPER + L"], "layout rotation was not exposed")
+assert(_G.__omalattice_rotate_layout == bindings["SUPER + L"], "layout rotation was not exposed")
 
 -- dwindle -> scrolling is left to Omarchy's own toggle.
 active_workspace = { id = 3, tiled_layout = "dwindle", special = false }
@@ -155,24 +155,24 @@ bindings["SUPER + L"]()
 assert(last_exec() == "omarchy-hyprland-workspace-layout-toggle", "dwindle should use Omarchy's toggle")
 assert(saved_workspaces() == "", "dwindle step should not save a workspace")
 
--- scrolling -> Hyprscroll2D on the focused workspace only.
+-- scrolling -> Omalattice on the focused workspace only.
 active_workspace = { id = 3, tiled_layout = "scrolling", special = false }
 bindings["SUPER + L"]()
 assert(#workspace_rules == 1 and workspace_rules[1].workspace == "3"
-    and workspace_rules[1].layout == "lua:hyprscroll2d", "scrolling did not rotate into Hyprscroll2D")
+    and workspace_rules[1].layout == "lua:omalattice", "scrolling did not rotate into Omalattice")
 assert(saved_workspaces() == "3\n", "rotated workspace was not saved")
 assert(last_exec():find("omarchy-notification-send", 1, true), "rotation did not notify")
 
--- Hyprscroll2D -> dwindle, forgetting the workspace and leaving overview first.
-active_workspace = { id = 3, tiled_layout = "lua:hyprscroll2d", special = false }
+-- Omalattice -> dwindle, forgetting the workspace and leaving overview first.
+active_workspace = { id = 3, tiled_layout = "lua:omalattice", special = false }
 overview_active = true
 bindings["SUPER + L"]()
 assert(dispatched[#dispatched - 1].message == "overview-exit", "overview should exit before leaving the layout")
-assert(last_exec() == "omarchy-hyprland-workspace-layout-toggle", "Hyprscroll2D should hand back to Omarchy")
+assert(last_exec() == "omarchy-hyprland-workspace-layout-toggle", "Omalattice should hand back to Omarchy")
 assert(saved_workspaces() == "", "workspace was not forgotten")
 overview_active = false
 
--- Special workspaces never rotate into Hyprscroll2D.
+-- Special workspaces never rotate into Omalattice.
 active_workspace = { id = -98, tiled_layout = "scrolling", special = true }
 bindings["SUPER + L"]()
 assert(last_exec() == "omarchy-hyprland-workspace-layout-toggle", "special workspace should use Omarchy's toggle")
@@ -183,7 +183,7 @@ for _, key in ipairs({ "mouse_down", "mouse_up", "mouse_left", "mouse_right" }) 
     assert(scroll_binds[key] and not scroll_binds[key].enabled, key .. " scroll bind should start disabled")
 end
 overview_active = true
-_G.__hyprscroll2d_overview_changed()
+_G.__omalattice_overview_changed()
 for _, key in ipairs({ "mouse_down", "mouse_up", "mouse_left", "mouse_right" }) do
     assert(scroll_binds[key].enabled, key .. " scroll bind should enable with the overview")
 end
@@ -192,11 +192,11 @@ assert(dispatched[#dispatched].message == "scroll down", "wheel down did not scr
 scroll_binds.mouse_left.action()
 assert(dispatched[#dispatched].message == "scroll left", "wheel left did not scroll the overview")
 overview_active = false
-_G.__hyprscroll2d_overview_changed()
+_G.__omalattice_overview_changed()
 assert(not scroll_binds.mouse_down.enabled, "scroll bind should disable when the overview closes")
 
 -- The plugin restores saved workspaces and pins nothing by default.
-local workspace_file = assert(io.open(state_home .. "/hyprscroll2d/workspaces", "w"))
+local workspace_file = assert(io.open(state_home .. "/omalattice/workspaces", "w"))
 workspace_file:write("5\n7\n")
 workspace_file:close()
 workspace_rules = {}
@@ -208,7 +208,7 @@ assert(loadfile(root .. "/integration/plugin.lua"))()
 assert(#workspace_rules == 2, "plugin reload did not reapply saved workspaces")
 
 local config = assert(loadfile(root .. "/layout/config.lua"))()
-assert(config.workspace == nil, "Hyprscroll2D should not pin a workspace by default")
+assert(config.workspace == nil, "Omalattice should not pin a workspace by default")
 
 os.getenv = original_getenv
 os.execute("rm -rf '" .. state_home .. "'")

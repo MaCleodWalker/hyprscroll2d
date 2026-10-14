@@ -25,7 +25,7 @@ Research was performed against Hyprland 0.56.2 on 2026-08-24.
   explicitly avoids grids, cells and snapping.
 
 Several maintained projects therefore explore the broader infinite-canvas
-idea. No project found during the search matched Hyprscroll2D's specific
+idea. No project found during the search matched Omalattice's specific
 combination: a pure-Lua `hl.layout.register` layout, discrete tiled cells,
 independent horizontal and vertical size presets, two-axis edge peeks and
 native Omarchy plugin packaging.

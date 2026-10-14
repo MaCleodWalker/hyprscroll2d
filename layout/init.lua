@@ -1,9 +1,9 @@
-if rawget(_G, "__hyprscroll2d_layout_registered") then return true end
+if rawget(_G, "__omalattice_layout_registered") then return true end
 
 local function current_dir()
     local source = debug and debug.getinfo(1, "S").source
     if type(source) ~= "string" or source:sub(1, 1) ~= "@" then
-        error("hyprscroll2d: unable to resolve layout directory")
+        error("omalattice: unable to resolve layout directory")
     end
     return source:sub(2):match("^(.*)/[^/]*$")
 end
@@ -18,7 +18,7 @@ local config = load_relative("config.lua")
 local core = load_relative("core.lua")
 local workspaces = {}
 local overview_status_path = os.getenv("XDG_RUNTIME_DIR")
-    and (os.getenv("XDG_RUNTIME_DIR") .. "/hyprscroll2d-overview")
+    and (os.getenv("XDG_RUNTIME_DIR") .. "/omalattice-overview")
 
 local last_overview_status = nil
 
@@ -71,7 +71,7 @@ end
 if overview_status_path then
     local ok, err = write_overview_status("none", false)
     if not ok then
-        io.stderr:write("hyprscroll2d: unable to reset overview status: " .. tostring(err) .. "\n")
+        io.stderr:write("omalattice: unable to reset overview status: " .. tostring(err) .. "\n")
     end
 end
 
@@ -102,7 +102,7 @@ local function workspace_key(ctx)
     return "global"
 end
 
-_G.__hyprscroll2d_is_overview_active = function()
+_G.__omalattice_is_overview_active = function()
     local ok, window = pcall(hl.get_active_window)
     if not ok or not window then return false end
 
@@ -158,7 +158,7 @@ local function focus_descriptor(descriptor)
 end
 
 local function overview_changed()
-    local callback = rawget(_G, "__hyprscroll2d_overview_changed")
+    local callback = rawget(_G, "__omalattice_overview_changed")
     if callback then pcall(callback) end
 end
 
@@ -209,28 +209,28 @@ local function layout_msg(ctx, message)
     elseif command == "overview" then
         local enabled = not state.overview
         local ok, err = write_overview_status(workspace_key(ctx), enabled)
-        if not ok then return "hyprscroll2d: unable to update overview status: " .. tostring(err) end
+        if not ok then return "omalattice: unable to update overview status: " .. tostring(err) end
         core.set_overview(state, enabled)
         overview_changed()
     elseif command == "overview-exit" then
         local ok, err = write_overview_status(workspace_key(ctx), false)
-        if not ok then return "hyprscroll2d: unable to update overview status: " .. tostring(err) end
+        if not ok then return "omalattice: unable to update overview status: " .. tostring(err) end
         core.set_overview(state, false)
         overview_changed()
     elseif command == "scroll" then
         if state.overview then core.scroll_overview(state, argument, ctx.area, config) end
     elseif command == "resize" and argument == "width" then
         if extra ~= "grow" and extra ~= "shrink" then
-            return "hyprscroll2d: resize width expects grow or shrink"
+            return "omalattice: resize width expects grow or shrink"
         end
         core.resize_width(state, config, extra == "grow" and 1 or -1)
     elseif command == "resize" and argument == "height" then
         if extra ~= "grow" and extra ~= "shrink" then
-            return "hyprscroll2d: resize height expects grow or shrink"
+            return "omalattice: resize height expects grow or shrink"
         end
         core.resize_height(state, config, extra == "grow" and 1 or -1)
     else
-        return "hyprscroll2d: expected focus/move/pan/scroll <direction>, resize width/height grow/shrink, or center"
+        return "omalattice: expected focus/move/pan/scroll <direction>, resize width/height grow/shrink, or center"
     end
 
     return true
@@ -241,10 +241,10 @@ local function window_layout_name(window)
     return safe_field(layout, "name")
 end
 
-if not rawget(_G, "__hyprscroll2d_focus_subscription") then
+if not rawget(_G, "__omalattice_focus_subscription") then
     local ok, subscription = pcall(function()
         return hl.on("window.active", function(window)
-            if window_layout_name(window) == "lua:hyprscroll2d" then
+            if window_layout_name(window) == "lua:omalattice" then
                 local workspace = safe_field(window, "workspace")
                 local id = safe_field(workspace, "id")
                 local name = safe_field(workspace, "name")
@@ -267,13 +267,13 @@ if not rawget(_G, "__hyprscroll2d_focus_subscription") then
             end
         end)
     end)
-    if ok then _G.__hyprscroll2d_focus_subscription = subscription or true end
+    if ok then _G.__omalattice_focus_subscription = subscription or true end
 end
 
-hl.layout.register("hyprscroll2d", {
+hl.layout.register("omalattice", {
     recalculate = recalculate,
     layout_msg = layout_msg,
 })
 
-_G.__hyprscroll2d_layout_registered = true
+_G.__omalattice_layout_registered = true
 return true

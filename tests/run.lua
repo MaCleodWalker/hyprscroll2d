@@ -324,4 +324,4 @@ test("a pan past the edge keeps its distance when the grid closes up", function(
     assert(state.camera.col < 0, "camera should stay left of the grid")
 end)
 
-print(string.format("hyprscroll2d: %d tests passed", passed))
+print(string.format("omalattice: %d tests passed", passed))

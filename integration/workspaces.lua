@@ -1,6 +1,6 @@
 local M = {}
 
-local LAYOUT = "lua:hyprscroll2d"
+local LAYOUT = "lua:omalattice"
 
 local function shell_quote(value)
     return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
@@ -13,7 +13,7 @@ local function state_dir()
         if not home or home == "" then return nil end
         base = home .. "/.local/state"
     end
-    return base .. "/hyprscroll2d"
+    return base .. "/omalattice"
 end
 
 local function state_path()

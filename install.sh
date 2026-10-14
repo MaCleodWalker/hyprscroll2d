@@ -2,10 +2,10 @@
 
 set -eu
 
-start_marker="-- hyprscroll2d:start"
-end_marker="-- hyprscroll2d:end"
+start_marker="-- omalattice:start"
+end_marker="-- omalattice:end"
 workspace_override="${1:-}"
-config_file="${HYPRSCROLL2D_HYPRLAND_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua}"
+config_file="${OMALATTICE_HYPRLAND_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua}"
 repo_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 if [ -n "$workspace_override" ]; then
@@ -34,13 +34,13 @@ if ! grep -q 'default.hypr.omarchy' "$config_file"; then
 fi
 
 if grep -Fq -- "$start_marker" "$config_file"; then
-  printf 'Hyprscroll2D is already configured in %s\n' "$config_file"
+  printf 'Omalattice is already configured in %s\n' "$config_file"
   exit 0
 fi
 
-if grep -q 'hyprscroll2d/layout/init.lua' "$config_file"; then
-  printf 'Error: an unmarked Hyprscroll2D setup already exists in %s\n' "$config_file" >&2
-  printf 'Remove the old Hyprscroll2D lines before running this installer.\n' >&2
+if grep -q 'omalattice/layout/init.lua' "$config_file"; then
+  printf 'Error: an unmarked Omalattice setup already exists in %s\n' "$config_file" >&2
+  printf 'Remove the old Omalattice lines before running this installer.\n' >&2
   exit 1
 fi
 
@@ -54,7 +54,7 @@ esac
 escaped_repo=${repo_dir//\\/\\\\}
 escaped_repo=${escaped_repo//\"/\\\"}
 timestamp="$(date +%Y%m%d%H%M%S)"
-backup_file="${config_file}.hyprscroll2d.bak.${timestamp}"
+backup_file="${config_file}.omalattice.bak.${timestamp}"
 before_errors=""
 
 if command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
@@ -66,18 +66,18 @@ cp -p -- "$config_file" "$backup_file"
 {
   printf '\n%s\n' "$start_marker"
   printf 'do\n'
-  printf '  local hyprscroll2d = "%s"\n' "$escaped_repo"
-  printf '  local hyprscroll2d_config = dofile(hyprscroll2d .. "/layout/config.lua")\n'
-  printf '  dofile(hyprscroll2d .. "/layout/init.lua")\n'
-  printf '  dofile(hyprscroll2d .. "/integration/omarchy.lua")\n'
+  printf '  local omalattice = "%s"\n' "$escaped_repo"
+  printf '  local omalattice_config = dofile(omalattice .. "/layout/config.lua")\n'
+  printf '  dofile(omalattice .. "/layout/init.lua")\n'
+  printf '  dofile(omalattice .. "/integration/omarchy.lua")\n'
   if [ -n "$workspace_override" ]; then
-    printf '  hyprscroll2d_config.workspace = %s\n' "$workspace_override"
+    printf '  omalattice_config.workspace = %s\n' "$workspace_override"
   fi
-  printf '  if hyprscroll2d_config.workspace ~= nil then\n'
-  printf '    assert(type(hyprscroll2d_config.workspace) == "number" and hyprscroll2d_config.workspace >= 1 and hyprscroll2d_config.workspace %% 1 == 0, "hyprscroll2d: config.workspace must be a positive integer")\n'
-  printf '    hl.workspace_rule({ workspace = tostring(hyprscroll2d_config.workspace), layout = "lua:hyprscroll2d" })\n'
+  printf '  if omalattice_config.workspace ~= nil then\n'
+  printf '    assert(type(omalattice_config.workspace) == "number" and omalattice_config.workspace >= 1 and omalattice_config.workspace %% 1 == 0, "omalattice: config.workspace must be a positive integer")\n'
+  printf '    hl.workspace_rule({ workspace = tostring(omalattice_config.workspace), layout = "lua:omalattice" })\n'
   printf '  end\n'
-  printf '  dofile(hyprscroll2d .. "/integration/workspaces.lua").restore()\n'
+  printf '  dofile(omalattice .. "/integration/workspaces.lua").restore()\n'
   printf 'end\n'
   printf '%s\n' "$end_marker"
 } >> "$config_file"
@@ -88,7 +88,7 @@ if command -v luac >/dev/null 2>&1 && ! luac -p "$config_file"; then
   exit 1
 fi
 
-if [ "${HYPRSCROLL2D_SKIP_RELOAD:-0}" != "1" ] && command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+if [ "${OMALATTICE_SKIP_RELOAD:-0}" != "1" ] && command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
   if ! hyprctl reload >/dev/null; then
     printf 'Warning: Hyprland could not reload. The config was installed; reload it later.\n' >&2
   else
@@ -104,9 +104,9 @@ if [ "${HYPRSCROLL2D_SKIP_RELOAD:-0}" != "1" ] && command -v hyprctl >/dev/null 
 fi
 
 if [ -n "$workspace_override" ]; then
-  printf 'Installed Hyprscroll2D on workspace %s.\n' "$workspace_override"
+  printf 'Installed Omalattice on workspace %s.\n' "$workspace_override"
 else
-  printf 'Installed Hyprscroll2D. Press Super+L on any workspace to rotate it into the layout.\n'
+  printf 'Installed Omalattice. Press Super+L on any workspace to rotate it into the layout.\n'
 fi
 printf 'Config backup: %s\n' "$backup_file"
-printf 'Use Super+Arrow in a Hyprscroll2D workspace to explore.\n'
+printf 'Use Super+Arrow in a Omalattice workspace to explore.\n'

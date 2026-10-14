@@ -12,7 +12,7 @@ Item {
     readonly property var closedOverview: ({ workspace: "none", overview: false })
     property var overview: closedOverview
     readonly property string overviewStatusPath: Quickshell.env("XDG_RUNTIME_DIR")
-        + "/hyprscroll2d-overview"
+        + "/omalattice-overview"
     readonly property string wallpaperUrl: "file://" + Quickshell.env("HOME")
         + "/.local/state/omarchy/current/background"
     readonly property string bootstrapPath: decodeURIComponent(
@@ -122,7 +122,7 @@ Item {
             waitForEnd: true
             onStreamFinished: {
                 const message = text.trim()
-                if (message) console.warn("Hyprscroll2D:", message)
+                if (message) console.warn("Omalattice:", message)
             }
         }
     }

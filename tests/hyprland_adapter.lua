@@ -16,7 +16,7 @@ os.getenv = function(name)
     return original_getenv(name)
 end
 io.open = function(path, mode)
-    assert(path == "/tmp/hyprscroll2d-overview" and mode == "w", "unexpected overview status path")
+    assert(path == "/tmp/omalattice-overview" and mode == "w", "unexpected overview status path")
     return {
         write = function(_, value)
             overview_status = value
@@ -28,7 +28,7 @@ io.open = function(path, mode)
     }
 end
 
-_G.__hyprscroll2d_focus_subscription = nil
+_G.__omalattice_focus_subscription = nil
 _G.hl = {
     layout = {
         register = function(name, provider)
@@ -68,7 +68,7 @@ _G.hl = {
 }
 
 assert(loadfile(root .. "/layout/init.lua"))()
-assert(registered and registered.name == "hyprscroll2d", "layout did not register")
+assert(registered and registered.name == "omalattice", "layout did not register")
 assert(overview_status == '{"workspace":"none","overview":false}', "overview status was not reset on load")
 
 local function target(id, active, workspace)
@@ -79,7 +79,7 @@ local function target(id, active, workspace)
             active = active,
             mapped = true,
             workspace = { id = workspace or 9 },
-            layout = { name = "lua:hyprscroll2d" },
+            layout = { name = "lua:omalattice" },
         },
         place = function(self, box)
             self.placed = box
@@ -113,7 +113,7 @@ assert(type(response) == "string", "invalid resize command should return an erro
 
 response = registered.provider.layout_msg(ctx, "overview")
 assert(response == true, "overview command was rejected")
-assert(_G.__hyprscroll2d_is_overview_active(), "overview state was not exposed to keybindings")
+assert(_G.__omalattice_is_overview_active(), "overview state was not exposed to keybindings")
 assert(overview_status == '{"workspace":"workspace:9","overview":true}', "overview status was not published")
 local normal_width = a.placed.w
 registered.provider.recalculate(ctx)
@@ -141,14 +141,14 @@ assert(#dispatched == dispatch_count, "mouse selection should not exit overview"
 
 response = registered.provider.layout_msg(ctx, "overview-exit")
 assert(response == true, "overview exit command was rejected")
-assert(not _G.__hyprscroll2d_is_overview_active(), "overview state remained active after exit")
+assert(not _G.__omalattice_is_overview_active(), "overview state remained active after exit")
 assert(overview_status == '{"workspace":"workspace:9","overview":false}', "overview exit status was not published")
 registered.provider.recalculate(ctx)
 assert(b.placed.x > a.placed.x, "overview exit should restore the normal layout")
 
 -- A workspace too large for the minimum cell size scrolls and reports scroll bars.
 local overview_changes = 0
-_G.__hyprscroll2d_overview_changed = function() overview_changes = overview_changes + 1 end
+_G.__omalattice_overview_changed = function() overview_changes = overview_changes + 1 end
 local crowded_targets = {}
 for i = 1, 8 do crowded_targets[i] = target("crowd" .. i, i == 1, 30) end
 local crowded = { area = { x = 0, y = 0, w = 1000, h = 800 }, targets = crowded_targets }
@@ -170,7 +170,7 @@ assert(tile("0xcrowd1") < before_scroll, "scrolling right should move the tiles 
 response = registered.provider.layout_msg(crowded, "overview-exit")
 assert(response == true and overview_changes == 2, "overview exit was not announced")
 assert(overview_status == '{"workspace":"workspace:30","overview":false}', "overview exit should clear the scroll bars")
-_G.__hyprscroll2d_overview_changed = nil
+_G.__omalattice_overview_changed = nil
 
 local function activate(context, selected)
     for _, item in ipairs(context.targets) do
@@ -236,7 +236,7 @@ assert(#dispatched == dispatch_count, "other layouts should not move the cursor"
 
 -- Without thumbnails the overview resizes the real windows, as before.
 local real_loadfile = loadfile
-_G.__hyprscroll2d_layout_registered = nil
+_G.__omalattice_layout_registered = nil
 _G.loadfile = function(path)
     local chunk, err = real_loadfile(path)
     if chunk and path:match("config%.lua$") then

@@ -1,11 +1,13 @@
-# Hyprscroll2D
+# Omalattice
 
-[![Tests](https://github.com/kirollosatef/hyprscroll2d/actions/workflows/tests.yml/badge.svg)](https://github.com/kirollosatef/hyprscroll2d/actions/workflows/tests.yml)
+[![Tests](https://github.com/MaCleodWalker/omalattice/actions/workflows/tests.yml/badge.svg)](https://github.com/MaCleodWalker/omalattice/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Hyprscroll2D is an experimental two-dimensional scrolling layout for Hyprland.
-It turns a workspace into an expandable grid and lets you move through it in
-every direction.
+Omalattice is an experimental two-dimensional scrolling layout for Omarchy and
+Hyprland. It turns a workspace into an expandable grid and lets you move through
+it in every direction. It is a fork of
+[Hyprscroll2D](https://github.com/kirollosatef/hyprscroll2d) by kirollosatef;
+see [Credits](#credits).
 
 Unlike column-only scrolling layouts, windows can live above, below, left and
 right of each other. Configurable edge peeks keep nearby rows and columns
@@ -20,11 +22,11 @@ visible, so you never lose the shape of your workspace.
 - Visible edge peeks for neighboring rows and columns
 - A live thumbnail overview of all workspace windows with titles
 - Per-workspace in-memory layout state
-- Omarchy bindings that fall back to the normal action outside Hyprscroll2D
+- Omarchy bindings that fall back to the normal action outside Omalattice
 
 ## Status
 
-`v0.2.0` is an experimental preview for Hyprland `0.56.x`. It has been
+`v0.3.0` is an experimental preview for Hyprland `0.56.x`. It has been
 live-tested on Hyprland `0.56.2`. It is opt-in per workspace: nothing changes
 until you rotate a workspace into the layout with `Super+L`.
 
@@ -44,10 +46,10 @@ Requirements:
 Install and enable directly from GitHub:
 
 ```bash
-omarchy plugin add https://github.com/kirollosatef/hyprscroll2d --enable
+omarchy plugin add https://github.com/MaCleodWalker/omalattice --enable
 ```
 
-The plugin loads Hyprscroll2D at runtime without editing your Hyprland config.
+The plugin loads Omalattice at runtime without editing your Hyprland config.
 It adds the layout to Omarchy's `Super+L` workspace layout rotation, so you can
 use it on any workspace (see [Controls](#controls)). Workspaces you rotate into
 the layout are remembered across Hyprland reloads and restarts. To pin the
@@ -57,39 +59,64 @@ layout to one workspace at startup instead, set `workspace` in
 Update it later with:
 
 ```bash
-omarchy plugin update io.github.kirollosatef.hyprscroll2d
+omarchy plugin update io.github.macleodwalker.omalattice
 ```
 
 The repository contains a validated Omarchy `manifest.json` and can be
-installed through the official `omarchy plugin` command today. A listing on
-the community [Omarchy Plugin Marketplace](https://omarchyplugins.com/) is a
+installed through the official `omarchy plugin` command. A listing on the
+community [Omarchy Plugin Marketplace](https://plugins.omarchy.org/) is a
 separate review process and does not make a plugin part of Omarchy's bundled
 first-party plugins.
+
+### Requirements and dependencies
+
+- Omarchy Quattro with its shell (`omarchy-shell`, built on Quickshell) and
+  Hyprland `0.56.x`. The thumbnail overview uses Quickshell's screen capture
+  and needs the shell service; see `overview_thumbnails` to opt out.
+- `hyprctl`, `omarchy-notification-send` and
+  `omarchy-hyprland-workspace-layout-toggle`, all installed with Omarchy.
+- No other packages, no network access, no elevated privileges and no data
+  collection.
+
+### What it changes
+
+The plugin only acts at runtime and never edits your Hyprland or Omarchy
+configuration files.
+
+- It registers the `omalattice` layout and replaces some Omarchy keybindings
+  with versions that fall back to the original action outside the layout. It
+  rebinds `Super+L` to add Omalattice to the layout rotation, and adds
+  three-finger up/down swipes. Scroll binds are active only while an overview
+  is open.
+- It stores the workspaces you rotated into the layout in
+  `~/.local/state/omalattice/workspaces` and the overview state in
+  `$XDG_RUNTIME_DIR/omalattice-overview`.
+- It runs `hyprctl` and `omarchy-notification-send` locally.
+
+[Uninstalling](#uninstall) removes all of it.
 
 ### Alternative: config installer
 
 If your Omarchy version does not yet provide `omarchy plugin`, clone the
 project and run the config installer:
 
-Clone the project and run the installer:
-
 ```bash
-git clone https://github.com/kirollosatef/hyprscroll2d.git \
-  ~/.local/share/hyprscroll2d
-~/.local/share/hyprscroll2d/install.sh
+git clone https://github.com/MaCleodWalker/omalattice.git \
+  ~/.local/share/omalattice
+~/.local/share/omalattice/install.sh
 ```
 
 This alternative installer does not pin a workspace by default. Passing a
 workspace number pins that workspace to the layout for this installation:
 
 ```bash
-~/.local/share/hyprscroll2d/install.sh 8
+~/.local/share/omalattice/install.sh 8
 ```
 
 The installer:
 
 - creates a timestamped backup of `~/.config/hypr/hyprland.lua`;
-- loads Hyprscroll2D and its `Super+L` layout rotation;
+- loads Omalattice and its `Super+L` layout rotation;
 - reloads Hyprland and checks for configuration errors;
 - restores the backup automatically if the new block causes an error.
 
@@ -98,16 +125,16 @@ For a manual installation, add the following near the end of
 `require("hypr.*")` lines:
 
 ```lua
-local hyprscroll2d = os.getenv("HOME") .. "/.local/share/hyprscroll2d"
-local hyprscroll2d_config = dofile(hyprscroll2d .. "/layout/config.lua")
-dofile(hyprscroll2d .. "/layout/init.lua")
-dofile(hyprscroll2d .. "/integration/omarchy.lua")
+local omalattice = os.getenv("HOME") .. "/.local/share/omalattice"
+local omalattice_config = dofile(omalattice .. "/layout/config.lua")
+dofile(omalattice .. "/layout/init.lua")
+dofile(omalattice .. "/integration/omarchy.lua")
 
 -- Restore workspaces that were rotated into the layout with Super+L.
-dofile(hyprscroll2d .. "/integration/workspaces.lua").restore()
+dofile(omalattice .. "/integration/workspaces.lua").restore()
 
 -- Optional: pin one workspace to the layout.
--- hl.workspace_rule({ workspace = "9", layout = "lua:hyprscroll2d" })
+-- hl.workspace_rule({ workspace = "9", layout = "lua:omalattice" })
 ```
 
 Then reload and validate the configuration:
@@ -130,16 +157,16 @@ If `hyprctl configerrors` prints nothing, the manual setup is ready.
 | Shrink window width | `Super+=` |
 | Grow window height | `Super+Shift+=` |
 | Shrink window height | `Super+Shift+-` |
-| Rotate workspace layout (dwindle, scrolling, Hyprscroll2D) | `Super+L` |
+| Rotate workspace layout (dwindle, scrolling, Omalattice) | `Super+L` |
 | Toggle workspace overview | `Super+M` |
 | Select the focused overview window | `Super+Enter` |
 | Exit overview | `Super+Escape` |
 | Focus a window above/below | Three-finger swipe up/down |
 
 The focus, move and resize bindings retain Omarchy's normal behavior whenever
-the active window is not using Hyprscroll2D. `Super+Enter` selects the overview
+the active window is not using Omalattice. `Super+Enter` selects the overview
 window while overview is active and otherwise keeps Omarchy's terminal action.
-Three-finger vertical swipes focus the window above or below while Hyprscroll2D
+Three-finger vertical swipes focus the window above or below while Omalattice
 is active; the normal left/right workspace swipe remains unchanged.
 
 Hovering a neighboring edge peek focuses that window and centers the cursor
@@ -168,7 +195,7 @@ uniformly scale a client's rendered pixels.
 
 Edit [`layout/config.lua`](layout/config.lua) to change:
 
-- `workspace` (optional): workspace number pinned to Hyprscroll2D at startup;
+- `workspace` (optional): workspace number pinned to Omalattice at startup;
   unset by default, so workspaces opt in with `Super+L`
 - `peek_x` and `peek_y`: visible pixels from neighboring columns and rows
 - `gap_x` and `gap_y`: spacing between cells
@@ -183,7 +210,7 @@ Reload Hyprland after changing the values.
 ## Update a config installation
 
 ```bash
-git -C ~/.local/share/hyprscroll2d pull --ff-only
+git -C ~/.local/share/omalattice pull --ff-only
 hyprctl reload
 hyprctl configerrors
 ```
@@ -193,7 +220,7 @@ hyprctl configerrors
 If installed using `omarchy plugin add`, run:
 
 ```bash
-omarchy plugin remove io.github.kirollosatef.hyprscroll2d --yes
+omarchy plugin remove io.github.macleodwalker.omalattice --yes
 hyprctl reload
 ```
 
@@ -203,14 +230,14 @@ If installed using the alternative config installer, run its uninstaller
 before deleting the repository:
 
 ```bash
-~/.local/share/hyprscroll2d/uninstall.sh
+~/.local/share/omalattice/uninstall.sh
 ```
 
-It removes only the marked Hyprscroll2D block and creates another timestamped
+It removes only the marked Omalattice block and creates another timestamped
 config backup. Once it finishes, remove the cloned repository:
 
 ```bash
-rm -rf ~/.local/share/hyprscroll2d
+rm -rf ~/.local/share/omalattice
 ```
 
 ## Known limitations
@@ -242,8 +269,16 @@ projects, important differences and technical background.
 Contributions and real-world testing are welcome. Read
 [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
 
-Created by [kirollosatef](https://github.com/kirollosatef).
+## Credits
+
+Omalattice is a fork of [Hyprscroll2D](https://github.com/kirollosatef/hyprscroll2d)
+by [kirollosatef](https://github.com/kirollosatef), whose two-dimensional grid,
+camera and layout engine it builds on. It is maintained separately by
+[MaCleod Walker](https://github.com/MaCleodWalker) and adds the live thumbnail
+overview with scrolling, the `Super+L` rotation, gestures and gap-free grids.
 
 ## License
 
-MIT
+[MIT](LICENSE). The original work is copyright kirollosatef and its
+contributors; Omalattice's additions are copyright MaCleod Walker and
+Omalattice contributors.

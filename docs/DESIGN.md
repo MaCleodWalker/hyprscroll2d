@@ -1,4 +1,4 @@
-# Hyprscroll2D design
+# Omalattice design
 
 ## Mental model
 

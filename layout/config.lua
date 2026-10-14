@@ -1,5 +1,5 @@
 return {
-    -- Optionally pin Hyprscroll2D to one workspace at startup. Leave unset to
+    -- Optionally pin Omalattice to one workspace at startup. Leave unset to
     -- enable it per workspace by rotating the layout with Super+L.
     -- workspace = 9,
 
