@@ -54,6 +54,55 @@ test("moving into an occupied cell swaps windows", function()
     equal(core.position_of(state, "A").col, 1)
 end)
 
+test("absolute moves swap nonfocused windows without changing selection or presets", function()
+    local state = fresh({ "A", "B", "C" }, "A")
+    state.width_step_by_id.B = 1
+    state.height_step_by_id.C = 2
+    core.set_overview(state, true)
+    assert(core.move_to(state, "B", 2, 0))
+    equal(state.positions.B.col, 2)
+    equal(state.positions.C.col, 1)
+    equal(state.focused_id, "A")
+    equal(state.camera.col, 0)
+    equal(state.width_step_by_id.B, 1)
+    equal(state.height_step_by_id.C, 2)
+    equal(state.overview, true)
+end)
+
+test("absolute moves create rows and compact empty columns", function()
+    local state = fresh({ "A", "B", "C" }, "A")
+    assert(core.move_to(state, "B", 0, 1))
+    equal(state.positions.B.col, 0)
+    equal(state.positions.B.row, 1)
+    equal(state.positions.C.col, 1)
+    assert(core.move_to(state, "C", -1, -1))
+    equal(state.positions.C.col, 0)
+    equal(state.positions.C.row, 0)
+    equal(state.positions.A.col, 1)
+    equal(state.positions.A.row, 1)
+    equal(state.camera.col, 1)
+    equal(state.camera.row, 1)
+end)
+
+test("absolute moves reject invalid destinations and missing windows without mutations", function()
+    local state = fresh({ "A", "B" }, "A")
+    for _, value in ipairs({ 0.5, "1", false, math.huge, -math.huge, 0/0, 1000000, -1000000 }) do
+        local ok, err = core.move_to(state, "A", value, 0)
+        equal(ok, false)
+        assert(type(err) == "string")
+        equal(core.move_to(state, "A", 0, value), false)
+    end
+    equal(core.move_to(state, "A", nil, 0), false)
+    equal(core.move_to(state, "A", 0, nil), false)
+    equal(core.move_to(state, "missing", 0, 0), false)
+    equal(state.positions.A.col, 0)
+    equal(state.positions.A.row, 0)
+    equal(state.positions.B.col, 1)
+    equal(state.positions.B.row, 0)
+    equal(state.camera.col, 0)
+    assert(core.move_to(state, "A", 0, 0))
+end)
+
 test("focus prefers a window aligned on the requested axis", function()
     local state = fresh({ "A", "B", "C" }, "A")
     core.move(state, "down")
@@ -104,6 +153,33 @@ test("overview packs sparse positions into dense rows and columns", function()
         assert(placement.x + placement.w <= 300)
         assert(placement.y + placement.h <= 200)
     end
+end)
+
+test("overview drop grid matches thumbnail cells with sparse coordinates and scrolling", function()
+    local state = fresh({ "A", "B", "C" }, "A")
+    state.positions.A = { col = -10, row = 50 }
+    state.positions.B = { col = 30, row = -20 }
+    state.positions.C = { col = 70, row = 50 }
+    state.overview_scroll = { x = 20, y = 10 }
+    local area = { x = -1000, y = 200, w = 1000, h = 800 }
+    local placements = core.overview_placements(state, area, config)
+    local grid = core.overview_grid(state, area, config)
+    equal(grid.columns[1], -10)
+    equal(grid.columns[2], 30)
+    equal(grid.columns[3], 70)
+    equal(grid.rows[1], -20)
+    equal(grid.rows[2], 50)
+    for id, position in pairs(state.positions) do
+        local c, r
+        for index, col in ipairs(grid.columns) do if col == position.col then c = index - 1 end end
+        for index, row in ipairs(grid.rows) do if row == position.row then r = index - 1 end end
+        local box = placements[id]
+        local expected_x = area.x + grid.x + c * (grid.w + grid.gap_x) + (grid.w - box.w) / 2
+        local expected_y = area.y + grid.y + r * (grid.h + grid.gap_y) + (grid.h - box.h) / 2
+        assert(math.abs(box.x - expected_x) < 0.001)
+        assert(math.abs(box.y - expected_y) < 0.001)
+    end
+    equal(core.overview_grid(core.new_state(), area, config), nil)
 end)
 
 test("overview caps gaps when the viewport is too small for all cells", function()

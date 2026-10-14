@@ -89,6 +89,18 @@ Item {
         ])
     }
 
+    function moveWindow(address, col, row, workspace) {
+        if (dropper.running) {
+            console.warn("Omalattice: another minimap drop is still being applied")
+            return
+        }
+        const message = "overview-drop " + address + " " + col + " " + row + " " + workspace
+        dropper.command = ["hyprctl", "eval",
+            "local result = hl.dispatch(hl.dsp.layout(" + root.luaQuote(message) + "))"
+                + " if not result.ok then error(\"Omalattice: minimap drop rejected\") end"]
+        dropper.running = true
+    }
+
     Component.onCompleted: {
         refreshLayout()
         loadTimer.start()
@@ -118,6 +130,24 @@ Item {
         repeat: true
         running: true
         onTriggered: root.refreshLayout()
+    }
+
+    Process {
+        id: dropper
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0 || exitStatus !== 0)
+                console.warn("Omalattice: unable to apply minimap drop (exit " + exitCode + ")")
+            root.refreshLayout()
+            overviewStatus.reload()
+        }
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: if (text.trim() && text.trim() !== "ok") console.warn("Omalattice:", text.trim())
+        }
+        stderr: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: if (text.trim()) console.warn("Omalattice:", text.trim())
+        }
     }
 
     Process {
@@ -320,6 +350,7 @@ Item {
                         anchors.fill: parent
 
                         Repeater {
+                            id: tileRepeater
                             // Delegates are kept while the window count is unchanged, so
                             // their captures keep running as the tiles move.
                             model: screenOverlay.tiles.length
@@ -345,6 +376,7 @@ Item {
                                 y: fromY + (modelData.y - fromY) * t - screenOverlay.overview.area.y
                                 width: fromW + (modelData.w - fromW) * t
                                 height: fromH + (modelData.h - fromH) * t
+                                opacity: dragInput.dragging && dragInput.address === modelData.address ? 0.35 : 1
 
                                 // The thumbnail keeps the window's proportions inside its cell.
                                 Item {
@@ -378,34 +410,14 @@ Item {
                                         border.color: cell.selected ? "#e8a838" : "#55ffffff"
                                     }
 
-                                    Rectangle {
-                                        id: titleBar
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.top: parent.top
-                                        height: titleText.implicitHeight + 12
-                                        opacity: cell.t
-                                        color: "#dd171923"
-
-                                        Text {
-                                            id: titleText
-                                            anchors.left: parent.left
-                                            anchors.right: parent.right
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            anchors.leftMargin: 10
-                                            anchors.rightMargin: 10
-                                            text: cell.info ? cell.info.title || cell.info.class || "" : ""
-                                            color: "#f4f4f5"
-                                            font.pixelSize: 13
-                                            font.weight: Font.DemiBold
-                                            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
-                                        }
-                                    }
-
-                                    MouseArea {
+                                    MinimapInput {
                                         anchors.fill: parent
-                                        onClicked: root.enterWindow(cell.modelData.address)
+                                        controller: dragInput
+                                        address: cell.modelData.address || ""
+                                        title: cell.info ? cell.info.title || cell.info.class || "" : ""
+                                        opacity: cell.t
                                     }
+
                                 }
                             }
                         }
@@ -446,6 +458,45 @@ Item {
                             width: Math.max(24, screenOverlay.bars[1] * parent.width)
                             radius: 3
                             color: "#ccf4f4f5"
+                        }
+                    }
+
+                    MinimapDrag {
+                        id: dragInput
+                        anchors.fill: parent
+                        enabled: screenOverlay.active && screenOverlay.progress >= 0.999
+                            && !screenOverlay.dragging && !dropper.running
+                        tiles: screenOverlay.tiles
+                        grid: screenOverlay.overview.grid || null
+                        workspace: screenOverlay.overview.workspace || ""
+                        onWindowClicked: address => root.enterWindow(address)
+                        onMoveRequested: (address, col, row) => root.moveWindow(address, col, row, dragInput.workspace)
+                    }
+
+                    Item {
+                        x: dragInput.previewX
+                        y: dragInput.previewY
+                        width: dragInput.sourceBox.width
+                        height: dragInput.sourceBox.height
+                        visible: dragInput.dragging
+                        opacity: 0.85
+                        readonly property var toplevel: root.toplevelFor(dragInput.address, root.refreshTick)
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "#1b1e28"
+                        }
+                        ScreencopyView {
+                            anchors.fill: parent
+                            live: true
+                            captureSource: parent.visible && parent.toplevel ? parent.toplevel.wayland : null
+                        }
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            border.color: "#e8a838"
+                            border.width: 3
+                            radius: 4
                         }
                     }
                 }

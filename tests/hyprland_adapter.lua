@@ -159,6 +159,37 @@ assert(a.placed.x >= 0 and a.placed.x + a.placed.w <= ctx.area.w, "overview wind
 assert(a.placed.x == b.placed.x, "overview windows should be stacked")
 assert(overview_status:find('"thumbnails":true', 1, true), "thumbnails should be enabled by default")
 
+assert(overview_status:find('"columns":[0,1],"rows":[0]', 1, true), "drop grid axes were not published")
+local before_drop_dispatches = #dispatched
+assert(registered.provider.layout_msg(ctx, "overview-drop 0xB 0 0 workspace:9") == true)
+registered.provider.recalculate(ctx)
+assert(tile("0xB") < tile("0xA"), "an occupied drop should swap the thumbnails")
+assert(#dispatched == before_drop_dispatches, "a drop should not change focus")
+assert(_G.__omalattice_is_overview_active(), "a drop should keep the overview open")
+assert(registered.provider.layout_msg(ctx, "overview-drop 0xB 1 0 workspace:9") == true)
+registered.provider.recalculate(ctx)
+assert(registered.provider.layout_msg(ctx, "overview-drop 0xB 0 1 workspace:9") == true)
+registered.provider.recalculate(ctx)
+local _, drop_ay = tile("0xA")
+local _, drop_by = tile("0xB")
+assert(drop_by > drop_ay, "an empty drop should create a second row")
+local saved_drop = assert(loadfile(root .. "/layout/persist.lua"))().load()["workspace:9"]
+assert(saved_drop and #saved_drop.windows == 2, "the dropped layout was not saved")
+assert(saved_drop.windows[2].row == 1, "the saved layout did not retain the dropped row")
+for _, invalid in ipairs({
+    "overview-drop", "overview-drop 0xB 0.5 0 workspace:9",
+    "overview-drop 0xB 1000000 0 workspace:9",
+    "overview-drop 0xB 0 0 workspace:10",
+    "overview-drop 0xmissing 0 0 workspace:9",
+}) do
+    assert(type(registered.provider.layout_msg(ctx, invalid)) == "string", "invalid drop was accepted: " .. invalid)
+end
+registered.provider.recalculate(ctx)
+local _, unchanged_by = tile("0xB")
+assert(unchanged_by == drop_by, "a rejected drop changed the layout")
+assert(registered.provider.layout_msg(ctx, "overview-drop 0xB 1 0 workspace:9") == true)
+registered.provider.recalculate(ctx)
+
 a.window.active = false
 b.window.active = true
 local dispatch_count = #dispatched
@@ -169,6 +200,8 @@ response = registered.provider.layout_msg(ctx, "overview-exit")
 assert(response == true, "overview exit command was rejected")
 assert(not _G.__omalattice_is_overview_active(), "overview state remained active after exit")
 assert(overview_status == '{"workspace":"workspace:9","overview":false}', "overview exit status was not published")
+assert(type(registered.provider.layout_msg(ctx, "overview-drop 0xB 0 0 workspace:9")) == "string",
+    "a closed overview must reject drops")
 registered.provider.recalculate(ctx)
 assert(b.placed.x > a.placed.x, "overview exit should restore the normal layout")
 
