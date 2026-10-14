@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep the overview below higher-priority shell surfaces so the screensaver
+  can appear above it.
 - Make the touchpad swipes follow the fingers: three-finger swipes slide the
   grid and settle on a window, and four-finger swipes grow the overview out of
   the windows and shrink it back (`swipe_distance`).
