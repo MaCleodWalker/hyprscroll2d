@@ -70,6 +70,11 @@ end
 -- thumbnail out of its window, so opening and closing look continuous.
 local function overview_payload(ctx, state, descriptors, tiles, origins)
     local bars = core.overview_scrollbars(state, ctx.area, config)
+    local grid = core.overview_grid(state, ctx.area, config)
+    local grid_json = grid and string.format(
+        ',"grid":{"x":%.2f,"y":%.2f,"w":%.2f,"h":%.2f,"gapX":%.2f,"gapY":%.2f,"columns":[%s],"rows":[%s]}',
+        grid.x, grid.y, grid.w, grid.h, grid.gap_x, grid.gap_y,
+        table.concat(grid.columns, ","), table.concat(grid.rows, ",")) or ""
     local inset = origins and window_inset() or 0
     local entries = {}
     for _, id in ipairs(state.ids) do
@@ -88,11 +93,11 @@ local function overview_payload(ctx, state, descriptors, tiles, origins)
     end
 
     return string.format(
-        ',"thumbnails":%s,"area":{"x":%.2f,"y":%.2f,"w":%.2f,"h":%.2f},"bars":[%.4f,%.4f,%.4f,%.4f],"tiles":[%s]',
+        ',"thumbnails":%s,"area":{"x":%.2f,"y":%.2f,"w":%.2f,"h":%.2f},"bars":[%.4f,%.4f,%.4f,%.4f],"tiles":[%s]%s',
         config.overview_thumbnails ~= false and "true" or "false",
         ctx.area.x, ctx.area.y, ctx.area.w, ctx.area.h,
         bars.x.start, bars.x.size, bars.y.start, bars.y.size,
-        table.concat(entries, ","))
+        table.concat(entries, ","), grid_json)
 end
 
 -- How far open the overview is while a swipe drives it. The shell follows
@@ -332,6 +337,21 @@ end
 
 local function layout_msg(ctx, message)
     local state, descriptors = context(ctx)
+    if message:match("^overview%-drop") then
+        local address, col, row, workspace = message:match(
+            "^overview%-drop%s+(%S+)%s+([%-]?%d+)%s+([%-]?%d+)%s+(.+)$")
+        if not address then return "omalattice: overview-drop expects address column row workspace" end
+        if not state.overview then return "omalattice: drops require an open overview" end
+        if workspace ~= workspace_key(ctx) then return "omalattice: drop workspace has changed" end
+        local id
+        for candidate, descriptor in pairs(descriptors) do
+            if descriptor.address == address then id = candidate; break end
+        end
+        if not id then return "omalattice: dropped window is no longer in this workspace" end
+        local ok, err = core.move_to(state, id, tonumber(col), tonumber(row))
+        if not ok then return "omalattice: " .. err end
+        return true
+    end
     local command, argument, extra = message:match("^(%S+)%s*(%S*)%s*(%S*)$")
 
     if command == "focus" then

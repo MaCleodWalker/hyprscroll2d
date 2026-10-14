@@ -241,18 +241,28 @@ function M.move(state, direction)
     local focused = focused_id and state.positions[focused_id]
     if not vector or not focused then return false end
 
-    local destination_col = focused.col + vector.dc
-    local destination_row = focused.row + vector.dr
-    local destination_id = occupied_positions(state, focused_id)[position_key(destination_col, destination_row)]
+    return M.move_to(state, focused_id, focused.col + vector.dc, focused.row + vector.dr)
+end
+
+function M.move_to(state, id, col, row)
+    local position = state.positions[id]
+    if not position then return false, "window is no longer in this workspace" end
+    if col == nil or row == nil then return false, "destination requires a column and row" end
+    for _, value in ipairs({ col, row }) do
+        if type(value) ~= "number" or value ~= value or value % 1 ~= 0
+            or value <= -1000000 or value >= 1000000 then
+            return false, "destination must be an integer cell within the grid limits"
+        end
+    end
+    if position.col == col and position.row == row then return true end
+
+    local destination_id = occupied_positions(state, id)[position_key(col, row)]
 
     if destination_id then
         local other = state.positions[destination_id]
-        other.col, focused.col = focused.col, other.col
-        other.row, focused.row = focused.row, other.row
-    else
-        focused.col = destination_col
-        focused.row = destination_row
+        other.col, other.row = position.col, position.row
     end
+    position.col, position.row = col, row
 
     compact(state)
     M.follow(state)
@@ -426,6 +436,8 @@ local function overview_metrics(state, area, config)
     end
 
     return {
+        columns = columns,
+        rows = rows,
         column_index = column_index,
         row_index = row_index,
         padding_x = padding_x,
@@ -442,6 +454,22 @@ end
 -- Content smaller than the viewport is centered instead of hugging a corner.
 local function centering(metrics, area)
     return math.max(0, (area.w - metrics.content_width) / 2), math.max(0, (area.h - metrics.content_height) / 2)
+end
+
+local function grid_geometry(metrics, state, area)
+    local offset_x, offset_y = centering(metrics, area)
+    return {
+        x = offset_x + metrics.padding_x - state.overview_scroll.x,
+        y = offset_y + metrics.padding_y - state.overview_scroll.y,
+        w = metrics.cell_width, h = metrics.cell_height,
+        gap_x = metrics.gap_x, gap_y = metrics.gap_y,
+        columns = metrics.columns, rows = metrics.rows,
+    }
+end
+
+function M.overview_grid(state, area, config)
+    local metrics = overview_metrics(state, area, config)
+    return metrics and grid_geometry(metrics, state, area) or nil
 end
 
 -- Keep one cell axis inside the viewport, preferring the leading edge.
@@ -473,16 +501,16 @@ function M.overview_placements(state, area, config)
     scroll.y = clamp(scroll.y, 0, math.max(0, metrics.content_height - area.h))
 
     local placements = {}
-    local offset_x, offset_y = centering(metrics, area)
+    local grid = grid_geometry(metrics, state, area)
 
     for id, position in pairs(state.positions) do
         local width_step = clamp(state.width_step_by_id[id] or config.default_width_step, 1, #config.width_steps)
         local height_step = clamp(state.height_step_by_id[id] or config.default_height_step, 1, #config.height_steps)
         local width = metrics.cell_width * config.width_steps[width_step]
         local height = metrics.cell_height * config.height_steps[height_step]
-        local cell_x = area.x + offset_x + metrics.padding_x - scroll.x
+        local cell_x = area.x + grid.x
             + ((metrics.column_index[position.col] - 1) * (metrics.cell_width + metrics.gap_x))
-        local cell_y = area.y + offset_y + metrics.padding_y - scroll.y
+        local cell_y = area.y + grid.y
             + ((metrics.row_index[position.row] - 1) * (metrics.cell_height + metrics.gap_y))
 
         placements[id] = {

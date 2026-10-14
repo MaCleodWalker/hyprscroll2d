@@ -209,7 +209,23 @@ overview is open.
 In overview mode, every window is shown as a live, scaled-down thumbnail with
 its title across the top. Use `Super+Arrow` to select a window and
 `Super+Enter` to return to it, or click a window directly to enter it.
+Drag a thumbnail by its title bar to rearrange the minimap grid without leaving overview:
+dropping on an occupied cell swaps the two windows, and dropping on an empty
+cell moves the window there. The highlighted cell previews the destination.
+Drop in the space beyond the grid to add an adjacent row or column; empty
+rows and columns compact away, just as with keyboard moves. Hold near the
+viewport edge to autoscroll a large grid. Releasing outside the viewport
+cancels the move. Dragging preserves the selected window and size presets,
+and the new arrangement is saved with the workspace layout. This requires
+live thumbnails to be enabled.
+The thumbnail body remains click-to-enter; it does not start a drag.
 `Super+M` and `Super+Escape` also exit overview mode.
+
+After installing an update that changes the Lua layout, relaunch Hyprland
+to load the new layout handler. Restarting only the shell reloads the QML
+but not the already-registered Lua code. Drag-and-drop needs both the
+updated shell plugin and layout; if a drag has no highlighted destination,
+the running layout may be missing its drop grid.
 
 Thumbnails are drawn by the Omarchy shell service, so the real windows keep
 their size and applications do not re-lay out while the overview is open.
