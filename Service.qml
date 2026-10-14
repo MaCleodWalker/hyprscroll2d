@@ -228,8 +228,7 @@ Item {
                         width: windowData && windowData.size
                             ? Math.max(1, Math.min(
                                 windowData.size[0] - 16,
-                                screenOverlay.screenGeometry.width - 16,
-                                titleMeasure.implicitWidth + 24
+                                screenOverlay.screenGeometry.width - 16
                             )) : 1
                         height: titleText.implicitHeight + 16
                         visible: !!windowData
@@ -238,14 +237,6 @@ Item {
 
                         radius: 5
                         color: "#dd171923"
-
-                        // Unwrapped copy used only to size the label to its text.
-                        Text {
-                            id: titleMeasure
-                            visible: false
-                            text: titleText.text
-                            font: titleText.font
-                        }
 
                         Text {
                             id: titleText
