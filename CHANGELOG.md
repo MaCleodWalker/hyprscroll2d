@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Document recovery for a missing settings icon when Omarchy retains an
+  older service-only enablement instead of adding the bar widget.
 - Keep the overview below higher-priority shell surfaces so the screensaver
   can appear above it.
 - Make the touchpad swipes follow the fingers: three-finger swipes slide the

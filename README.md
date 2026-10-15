@@ -62,6 +62,26 @@ Update it later with:
 omarchy plugin update io.github.macleodwalker.omalattice
 ```
 
+#### Settings icon missing after installation or update
+
+Some Omarchy versions leave an existing service-only enablement in place when
+a plugin gains a bar widget. Selecting a bar section, or running
+`omarchy plugin enable ... --section right`, can then report success without
+adding the settings icon.
+
+Disable and re-enable Omalattice to replace the old enablement with a bar
+entry:
+
+```bash
+omarchy plugin disable io.github.macleodwalker.omalattice &&
+omarchy plugin enable io.github.macleodwalker.omalattice --section right
+```
+
+Use `left` or `center` instead of `right` for a different section. This does
+not uninstall the plugin or reset your saved layout settings.
+
+### Plugin packaging
+
 The repository contains a validated Omarchy `manifest.json` and can be
 installed through the official `omarchy plugin` command. A listing on the
 community [Omarchy Plugin Marketplace](https://plugins.omarchy.org/) is a
@@ -80,8 +100,9 @@ first-party plugins.
 
 ### What it changes
 
-The plugin only acts at runtime and never edits your Hyprland or Omarchy
-configuration files.
+The layout integration acts at runtime and never edits your Hyprland
+configuration files. Omarchy's plugin commands manage enablement and the
+settings icon's bar placement in `~/.config/omarchy/shell.json`.
 
 - It registers the `omalattice` layout and replaces some Omarchy keybindings
   with versions that fall back to the original action outside the layout. It
