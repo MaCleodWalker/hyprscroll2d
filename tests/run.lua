@@ -23,6 +23,11 @@ end
 
 local function fresh(ids, active)
     local state = core.new_state()
+    local opened = {}
+    for _, id in ipairs(ids) do
+        table.insert(opened, id)
+        core.sync(state, opened, id, config)
+    end
     core.sync(state, ids, active, config)
     return state
 end
@@ -33,10 +38,120 @@ test("first window starts at origin", function()
     equal(core.position_of(state, "A").row, 0)
 end)
 
-test("new windows extend to the right", function()
+test("new windows extend right when opened from the last window", function()
     local state = fresh({ "A", "B", "C" }, "A")
     equal(core.position_of(state, "B").col, 1)
     equal(core.position_of(state, "C").col, 2)
+end)
+
+test("new windows fill adjacent holes in right down left up order", function()
+    local neighbors = {
+        { col = 2, row = 1 },
+        { col = 1, row = 2 },
+        { col = 0, row = 1 },
+        { col = 1, row = 0 },
+    }
+    for next_hole = 1, #neighbors do
+        local state = fresh({ "A", "B", "C", "D", "E", "F" }, "A")
+        state.positions.A = { col = 1, row = 1 }
+        state.positions.B = { col = 0, row = 0 }
+        state.positions.C = { col = 2, row = 2 }
+        local ids = { "A", "B", "C" }
+        for index = 1, next_hole - 1 do
+            local id = ({ "D", "E", "F" })[index]
+            state.positions[id] = { col = neighbors[index].col, row = neighbors[index].row }
+            table.insert(ids, id)
+        end
+        table.insert(ids, "new")
+        core.sync(state, ids, "new", config)
+        equal(state.positions.new.col, neighbors[next_hole].col)
+        equal(state.positions.new.row, neighbors[next_hole].row)
+        equal(state.positions.A.col, 1)
+        equal(state.positions.C.col, 2, "other windows must not shift when filling a hole")
+        equal(state.focused_id, "new")
+        equal(state.camera.col, neighbors[next_hole].col)
+        equal(state.camera.row, neighbors[next_hole].row)
+        equal(state.width_step_by_id.new, config.default_width_step)
+        equal(state.height_step_by_id.new, config.default_height_step)
+    end
+end)
+
+test("no adjacent hole inserts right and shifts only the focused row", function()
+    local state = fresh({ "A", "B", "C", "D", "E", "F" }, "B")
+    state.positions.A = { col = 0, row = 1 }
+    state.positions.B = { col = 1, row = 1 }
+    state.positions.C = { col = 2, row = 1 }
+    state.positions.D = { col = 1, row = 2 }
+    state.positions.E = { col = 2, row = 2 }
+    state.positions.F = { col = 1, row = 0 }
+    state.width_step_by_id.C = 1
+    state.height_step_by_id.C = 2
+    core.sync(state, { "A", "B", "C", "D", "E", "F", "new" }, "new", config)
+    equal(state.positions.new.col, 2)
+    equal(state.positions.new.row, 1)
+    equal(state.positions.A.col, 0)
+    equal(state.positions.B.col, 1)
+    equal(state.positions.C.col, 3)
+    equal(state.positions.D.col, 1)
+    equal(state.positions.E.col, 2)
+    equal(state.positions.F.col, 1)
+    equal(state.positions.F.row, 0)
+    equal(state.width_step_by_id.C, 1)
+    equal(state.height_step_by_id.C, 2)
+    equal(state.camera.col, 2)
+end)
+
+test("empty neighbors outside the grid are used before shifting", function()
+    for _, direction in ipairs({ "right", "down", "left", "up" }) do
+        local state = fresh({ "A", "B", "C", "D" }, "A")
+        state.positions.A = { col = 0, row = 0 }
+        local ids = { "A" }
+        local vectors = {
+            right = { col = 1, row = 0 },
+            down = { col = 0, row = 1 },
+            left = { col = -1, row = 0 },
+            up = { col = 0, row = -1 },
+        }
+        local expected = vectors[direction]
+        for _, candidate in ipairs({ "right", "down", "left", "up" }) do
+            if candidate == direction then break end
+            local id = ({ "B", "C", "D" })[#ids]
+            state.positions[id] = { col = vectors[candidate].col, row = vectors[candidate].row }
+            table.insert(ids, id)
+        end
+        table.insert(ids, "new")
+        core.sync(state, ids, "new", config)
+        equal(state.positions.new.col - state.positions.A.col, expected.col, direction)
+        equal(state.positions.new.row - state.positions.A.row, expected.row, direction)
+        for _, id in ipairs(ids) do
+            if id ~= "A" and id ~= "new" then
+                local original = id == "B" and vectors.right
+                    or id == "C" and vectors.down or vectors.left
+                equal(state.positions[id].col - state.positions.A.col, original.col)
+                equal(state.positions[id].row - state.positions.A.row, original.row)
+            end
+        end
+    end
+end)
+
+test("multiple new windows insert without collisions and repeated sync is stable", function()
+    local state = fresh({ "A", "B", "C" }, "B")
+    local ids = { "A", "B", "C", "D", "E" }
+    core.sync(state, ids, "B", config)
+    equal(state.positions.A.col, 0)
+    equal(state.positions.B.col, 1)
+    equal(state.positions.D.col, 1)
+    equal(state.positions.D.row, 2)
+    equal(state.positions.E.col, 1)
+    equal(state.positions.E.row, 0)
+    equal(state.positions.B.row, 1)
+    equal(state.positions.C.col, 2)
+    core.sync(state, ids, "B", config)
+    equal(state.positions.E.col, 1)
+    equal(state.positions.E.row, 0)
+    equal(state.positions.D.col, 1)
+    equal(state.positions.D.row, 2)
+    equal(state.positions.C.col, 2)
 end)
 
 test("moving down creates a second row", function()

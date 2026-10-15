@@ -247,6 +247,45 @@ local function under_cursor(context)
     end
 end
 
+local function open_row(context)
+    local items, active = context.targets, {}
+    context.targets = {}
+    for _, item in ipairs(items) do
+        active[item] = item.window.active
+        for _, opened in ipairs(context.targets) do opened.window.active = false end
+        item.window.active = true
+        table.insert(context.targets, item)
+        registered.provider.recalculate(context)
+    end
+    for _, item in ipairs(items) do item.window.active = active[item] end
+    registered.provider.recalculate(context)
+end
+
+local spawn_a, spawn_b, spawn_c = target("spawnA", true, 102),
+    target("spawnB", false, 102), target("spawnC", false, 102)
+local spawn = {
+    area = { x = 0, y = 0, w = 1000, h = 800 },
+    targets = { spawn_a, spawn_b, spawn_c },
+}
+open_row(spawn)
+local spawn_d = target("spawnD", true, 102)
+activate(spawn, spawn_b)
+registered.provider.recalculate(spawn)
+activate(spawn, spawn_d)
+table.insert(spawn.targets, spawn_d)
+registered.provider.recalculate(spawn)
+assert(spawn_a.placed.x < spawn_b.placed.x and spawn_b.placed.x < spawn_c.placed.x
+    and spawn_d.placed.x == spawn_b.placed.x and spawn_d.placed.y > spawn_b.placed.y,
+    "new active windows must expand downward instead of pushing the right neighbor")
+activate(spawn, spawn_a)
+registered.provider.recalculate(spawn)
+local spawn_e = target("spawnE", true, 102)
+activate(spawn, spawn_e)
+table.insert(spawn.targets, spawn_e)
+registered.provider.recalculate(spawn)
+assert(spawn_e.placed.y > spawn_a.placed.y and spawn_e.placed.x == spawn_a.placed.x,
+    "new active windows must fill the adjacent hole below the previous focus")
+
 for index, direction in ipairs({ "right", "left", "down", "up" }) do
     local vertical = direction == "down" or direction == "up"
     local forward = direction == "right" or direction == "down"
@@ -258,7 +297,7 @@ for index, direction in ipairs({ "right", "left", "down", "up" }) do
         area = { x = 100, y = 200, w = 1000, h = 800 },
         targets = items,
     }
-    registered.provider.recalculate(context)
+    open_row(context)
     if vertical then
         for i = 2, #items do
             activate(context, items[i])
@@ -368,7 +407,7 @@ local real_active_window = hl.get_active_window
 hl.get_active_window = function() return { workspace = { id = 60 } } end
 local swipe_targets = { target("swipe1", true, 60), target("swipe2", false, 60), target("swipe3", false, 60) }
 local swipe_ctx = { area = { x = 0, y = 0, w = 1000, h = 800 }, targets = swipe_targets }
-registered.provider.recalculate(swipe_ctx)
+open_row(swipe_ctx)
 dispatch_context = swipe_ctx
 local gestures_api = _G.__omalattice_gestures
 -- Hyprland makes the focused window active; the mock has to do that by hand.
@@ -514,6 +553,7 @@ local edges = {
     targets = { edge_a, edge_b, edge_c },
 }
 dispatch_context = edges
+open_row(edges)
 assert(_G.__omalattice_reload_config(edge_config))
 activate(edges, edge_c)
 assert(registered.provider.layout_msg(edges, "move down") == true)

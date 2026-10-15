@@ -34,11 +34,21 @@ local function occupied_positions(state, except_id)
     return occupied
 end
 
-local function find_open_right(state, anchor)
+local function place_near(state, anchor)
     local occupied = occupied_positions(state)
+    for _, direction in ipairs({ "right", "down", "left", "up" }) do
+        local vector = DIRECTIONS[direction]
+        local col, row = anchor.col + vector.dc, anchor.row + vector.dr
+        if not occupied[position_key(col, row)] then
+            return { col = col, row = row }
+        end
+    end
+
     local col = anchor.col + 1
-    while occupied[position_key(col, anchor.row)] do
-        col = col + 1
+    for _, position in pairs(state.positions) do
+        if position.row == anchor.row and position.col >= col then
+            position.col = position.col + 1
+        end
     end
     return { col = col, row = anchor.row }
 end
@@ -139,7 +149,7 @@ function M.sync(state, ids, active_id, config)
             local anchor = anchor_id and state.positions[anchor_id]
 
             if anchor then
-                state.positions[id] = find_open_right(state, anchor)
+                state.positions[id] = place_near(state, anchor)
             else
                 state.positions[id] = { col = 0, row = 0 }
             end

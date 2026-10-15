@@ -14,8 +14,10 @@ least 36px of an adjacent maximum-sized row or column remains visible.
 
 ## Initial behavior
 
-- New windows are placed in the first free cell to the right of the focused
-  window.
+- New windows fill a directly adjacent empty cell, checking right, down, left,
+  then up from the focused window and expanding the grid if needed. Only when
+  all four neighbors are occupied do they insert immediately to its right,
+  shifting windows at and beyond that column one cell right in that row only.
 - Directional focus prefers a window on the same row or column, then the
   nearest directional candidate.
 - Moving into an occupied cell swaps the two windows.

@@ -13,6 +13,11 @@ Unlike column-only scrolling layouts, windows can live above, below, left and
 right of each other. Configurable edge peeks keep nearby rows and columns
 visible, so you never lose the shape of your workspace.
 
+New windows fill an empty cell directly next to the focused window, checking
+right, down, left, then up, expanding the grid if needed. Only when all four
+neighbors are occupied does the new window insert immediately to its right,
+shifting the remaining windows in that row one cell right.
+
 ## What works
 
 - Infinite two-dimensional window placement
