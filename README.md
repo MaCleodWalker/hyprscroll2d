@@ -1,44 +1,48 @@
 # Omalattice
 
+**True 2D spatial scrolling and an interactive live-thumbnail minimap for Omarchy & Hyprland.**
+
 [![Tests](https://github.com/MaCleodWalker/omalattice/actions/workflows/tests.yml/badge.svg)](https://github.com/MaCleodWalker/omalattice/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Omalattice is an experimental two-dimensional scrolling layout for Omarchy and
-Hyprland. It turns a workspace into an expandable grid and lets you move through
-it in every direction. It is a fork of
-[Hyprscroll2D](https://github.com/kirollosatef/hyprscroll2d) by kirollosatef;
-see [Credits](#credits).
+![Omalattice — True 2D Spatial Scrolling & Interactive Minimap for Omarchy](preview.png)
 
-Unlike column-only scrolling layouts, windows can live above, below, left and
-right of each other. Configurable edge peeks keep nearby rows and columns
-visible, so you never lose the shape of your workspace.
+Omalattice turns any Hyprland workspace into an expandable two-dimensional lattice of tiled windows that you can navigate, rearrange, and swipe through in every direction. Unlike column-only scrolling tapes, windows live above, below, left, and right of each other—keeping related terminals, editors, browsers, and docs spatially grouped instead of buried down a single ribbon.
 
-New windows fill an empty cell directly next to the focused window, checking
-right, down, left, then up, expanding the grid if needed. Only when all four
-neighbors are occupied does the new window insert immediately to its right,
-shifting the remaining windows in that row one cell right.
+New windows automatically claim an open neighbor cell next to the focused window (`right → down → left → up`), expanding the 2D grid naturally before ever shifting an existing row. Configurable 4-way edge peeks keep adjacent rows and columns visible at the screen edges so you always feel the shape of your workspace.
 
-## What works
+Originally forked from [Hyprscroll2D](https://github.com/kirollosatef/hyprscroll2d) by kirollosatef (see [Credits](#credits)), Omalattice is purpose-built for Omarchy with a live drag-and-drop thumbnail minimap, 1:1 finger-following touchpad physics, persistent workspace grids, and a live bar settings menu.
 
-- Infinite two-dimensional window placement
-- Focus and camera movement on both axes
-- Directional window movement with collision swapping
-- Independent width and height presets
-- Visible edge peeks for neighboring rows and columns
-- A live thumbnail overview of all workspace windows with titles
-- Per-workspace grid layout, saved so it survives Hyprland restarts
-- Omarchy bindings that fall back to the normal action outside Omalattice
+## Highlights
 
-## Status
+- **Infinite 2D Spatial Grid & 4-Way Edge Peeks**
+  - Move focus, pan the camera, or move and collision-swap windows across both axes (`Super+Arrow`, `Super+Shift+Arrow`, `Super+Ctrl+Arrow`).
+  - Smart 4-way neighbor placement (`right`, `down`, `left`, `up`) fills adjacent free cells first, and empty rows or columns automatically compact away when windows close or move.
+  - Independent width and height presets let you size windows on either axis, from framed 4-way edge peeks (`peek_x` / `peek_y`) down to seamless zero-gap, edge-to-edge tiling.
+  - Debounced hover-focus (`hover_focus_delay`) centers the pointer when selecting an edge peek without accidentally scrolling the grid as your mouse crosses screen edges.
 
-`v0.3.0` is an experimental preview for Hyprland `0.56.x`. It has been
-live-tested on Hyprland `0.56.2`. It is opt-in per workspace: nothing changes
-until you rotate a workspace into the layout with `Super+L`.
+- **Interactive Live-Thumbnail Minimap (`Super+M`)**
+  - Powered by Quickshell `ScreencopyView`, every window renders as a live, scaled-down thumbnail with its title bar—real windows keep their full geometry and never reflow while the overview is open.
+  - **Drag and drop by the title bar** to rearrange your workspace directly in the minimap: drop onto an occupied cell to swap windows, drop onto an empty cell to move there, or drop past the outer edge to create a new row or column.
+  - Click any thumbnail body (or press `Super+Enter`) to jump straight into that window.
+  - Large workspaces never crush thumbnails below a readable minimum size (`overview_min_width` / `overview_min_height`); instead, the minimap scrolls smoothly via mouse wheel, touchpad, arrow selection, or viewport-edge autoscroll.
 
-The layout uses Hyprland's Lua custom-layout API, so it does not require a
-compiled Hyprland plugin. Native Omarchy Shell packaging loads the layout and
-keeps it active across Hyprland config reloads. Other Lua-configured Hyprland
-installations can load the layout, but must provide their own bindings.
+- **Fluid 1:1 Finger-Following Touchpad Gestures**
+  - **Three-finger swipes** (horizontal and vertical) slide the 2D grid directly under your fingers, settling onto the nearest window or flicking to the next with soft boundary spring-back at the ends of a row or column.
+  - **Four-finger vertical swipes** smoothly grow the live overview out of your windows as you swipe up and shrink it back into place as you swipe down.
+  - Automatically swaps Hyprland's horizontal workspace swipe for 2D grid sliding only while an Omalattice workspace is focused, and respects your touchpad's `natural_scroll` setting.
+
+- **Zero-Config Omarchy Integration**
+  - **Instant `Super+L` Layout Rotation**: Joins Omarchy's native workspace layout cycle (`dwindle → scrolling → Omalattice → dwindle`) on a per-workspace basis—nothing changes on workspaces where you haven't enabled it.
+  - **Live Omarchy Bar Settings Menu**: Includes a native bar widget (`󰕰`) with steppers and toggles for peeks, gaps, size presets, minimap options, and gestures that save to `~/.config/omalattice/config.lua` and apply immediately.
+  - **Persistent Workspace Grids**: Remembers which workspaces use Omalattice and saves each workspace's 2D cell coordinates, size presets, and camera position across Hyprland reloads and restarts, matching windows back to their cells by class and title.
+  - **Pure Lua Engine**: Uses Hyprland's native `hl.layout.register` Lua API—no compiled C++ plugin to rebuild on compositor updates, and all keybindings cleanly fall back to Omarchy's defaults outside Omalattice.
+
+## Compatibility
+
+`v0.3.0` targets Omarchy Quattro and Hyprland `0.56.x` (live-tested on Hyprland `0.56.2`). It is opt-in per workspace: nothing changes until you rotate a workspace into the layout with `Super+L`.
+
+Because Omalattice runs on Hyprland's Lua custom-layout API and Omarchy's Quickshell service layer, it loads at runtime without editing your Hyprland config files and stays active across config reloads. Other Lua-configured Hyprland setups can also load the core layout engine and provide their own bindings.
 
 ## Install on Omarchy
 
@@ -342,10 +346,13 @@ rm -rf ~/.local/share/omalattice
 
 ## Known limitations
 
-- State is reset when Hyprland reloads.
+- Saved grids match windows back to their cells by class and title; multiple
+  windows with identical classes and titles on the same workspace are assigned
+  in creation order.
 - Fullscreen, groups, multi-monitor moves, and special workspaces need more
   testing.
-- The bundled conditional keybinding integration supports Omarchy.
+- The bundled conditional keybinding integration and live thumbnail overview
+  target Omarchy.
 - Compatibility outside Hyprland `0.56.x` is not yet guaranteed.
 
 Please report issues with your Hyprland version, monitor geometry, relevant
@@ -374,8 +381,11 @@ Contributions and real-world testing are welcome. Read
 Omalattice is a fork of [Hyprscroll2D](https://github.com/kirollosatef/hyprscroll2d)
 by [kirollosatef](https://github.com/kirollosatef), whose two-dimensional grid,
 camera and layout engine it builds on. It is maintained separately by
-[MaCleod Walker](https://github.com/MaCleodWalker) and adds the live thumbnail
-overview with scrolling, the `Super+L` rotation, gestures and gap-free grids.
+[MaCleod Walker](https://github.com/MaCleodWalker) and adds the interactive
+live-thumbnail minimap with title-bar drag-and-drop, 1:1 finger-following
+touchpad gestures, persistent workspace grids, the Omarchy bar settings menu,
+`Super+L` layout rotation, smart 4-way neighbor placement, debounced hover
+focus, and compacted/gap-free grids.
 
 ## License
 
